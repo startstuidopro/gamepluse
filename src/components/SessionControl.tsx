@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { Station, Session } from '../types';
+import { addSessionToDatabase, updateSessionInDatabase } from '../utils/database';
 
 interface SessionControlProps {
   station: Station;
@@ -25,10 +26,12 @@ export default function SessionControl({ station, onClose, onUpdateSession }: Se
       game: formData.game,
       pricePerMinute: formData.pricePerMinute,
     };
+    addSessionToDatabase();
     onUpdateSession(station.id, newSession);
   };
 
   const handleEndSession = () => {
+    console.log('Ending session...');
     if (station.currentSession) {
       const endTime = new Date().toISOString();
       const startTime = new Date(station.currentSession.startTime).getTime();
@@ -42,10 +45,21 @@ export default function SessionControl({ station, onClose, onUpdateSession }: Se
         totalAmount,
       };
 
-      // Here you would typically save the session to your backend
-      console.log('Session ended:', endedSession);
-      
-      onUpdateSession(station.id, undefined);
+      const updatedData = {
+        user_id: parseInt(station.currentSession.userId, 10),
+        start_time: station.currentSession.startTime,
+        end_time: endTime,
+      };
+
+      updateSessionInDatabase(station.currentSession.id, updatedData, (err) => {
+        if (err) {
+          console.error('Error updating session in database:', err);
+        } else {
+          console.log('Session updated in database successfully');
+          console.log('Calling onUpdateSession with undefined...');
+          onUpdateSession(station.id, undefined);
+        }
+      });
     }
   };
 
