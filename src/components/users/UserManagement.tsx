@@ -3,7 +3,7 @@ import { User } from '../../types';
 import UserList from './UserList';
 import UserForm from './UserForm';
 import StaffList from './StaffList';
-import db from '../../database';
+import { getDatabase, waitForInit } from '../../database';
 import { useAuth } from '../../contexts/AuthContext';
 import { Shield, Users } from 'lucide-react';
 
@@ -23,20 +23,23 @@ export default function UserManagement() {
     setIsLoading(true);
     setError(null);
     try {
-      await db.waitForInit();
-      const results = await db.query<User>(`
-        SELECT 
-          id,
-          name,
-          phone,
-          role,
-          membership_type as membershipType,
-          credit,
-          last_active as lastActive
-        FROM users
-        ORDER BY name ASC
+      await waitForInit();
+      const db = await getDatabase();
+      const results = await db.exec(`
+        SELECT * FROM users ORDER BY name ASC
       `);
-      setUsers(results);
+      const usersData = results[0]?.values.map(row => ({
+        id: row[0],
+        name: row[1],
+        phone: row[2],
+        role: row[3],
+        membership_type: row[4],
+        credit: row[5],
+        last_active: row[6],
+        created_at: row[7],
+        updated_at: row[8]
+      })) as User[];
+      setUsers(usersData);
     } catch (err) {
       setError('Failed to load users. Please try again.');
       console.error('Error loading users:', err);
@@ -48,8 +51,9 @@ export default function UserManagement() {
   const handleSave = async (userData: Omit<User, 'id'>) => {
     try {
       setError(null);
+      const db = await getDatabase();
       if (editingUser) {
-        await db.run(`
+        await db.exec(`
           UPDATE users 
           SET name = ?, 
               phone = ?, 
@@ -62,23 +66,30 @@ export default function UserManagement() {
           userData.name,
           userData.phone,
           userData.role,
-          userData.membershipType,
+          userData.membership_type,
           userData.credit,
           userData.password_hash || null,
           editingUser.id
         ]);
 
-        const updated = await db.get<User>(`
-          SELECT 
-            id, name, phone, role, 
-            membership_type as membershipType, 
-            credit, last_active as lastActive
-          FROM users 
-          WHERE id = ?
+        const updatedResult = await db.exec(`
+          SELECT * FROM users WHERE id = ?
         `, [editingUser.id]);
 
-        if (updated) {
-          setUsers(users.map(u => u.id === updated.id ? updated : u));
+        if (updatedResult[0]?.values.length > 0) {
+          const updated = updatedResult[0].values[0];
+          const updatedUser = {
+            id: updated[0],
+            name: updated[1],
+            phone: updated[2],
+            role: updated[3],
+            membership_type: updated[4],
+            credit: updated[5],
+            last_active: updated[6],
+            created_at: updated[7],
+            updated_at: updated[8]
+          } as User;
+          setUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u));
         }
       } else {
         const result = await db.run(`
@@ -92,21 +103,28 @@ export default function UserManagement() {
           userData.phone,
           userData.password_hash || '123456',
           userData.role,
-          userData.membershipType,
+          userData.membership_type,
           userData.credit
         ]);
 
-        const created = await db.get<User>(`
-          SELECT 
-            id, name, phone, role, 
-            membership_type as membershipType, 
-            credit, last_active as lastActive
-          FROM users 
-          WHERE id = last_insert_rowid()
+        const createdResult = await db.exec(`
+          SELECT * FROM users WHERE id = last_insert_rowid()
         `);
 
-        if (created) {
-          setUsers([...users, created]);
+        if (createdResult[0]?.values.length > 0) {
+          const created = createdResult[0].values[0];
+          const createdUser = {
+            id: created[0],
+            name: created[1],
+            phone: created[2],
+            role: created[3],
+            membership_type: created[4],
+            credit: created[5],
+            last_active: created[6],
+            created_at: created[7],
+            updated_at: created[8]
+          } as User;
+          setUsers([...users, createdUser]);
         }
       }
       setEditingUser(null);
@@ -123,7 +141,8 @@ export default function UserManagement() {
 
     try {
       setError(null);
-      await db.run('DELETE FROM users WHERE id = ?', [userId]);
+      const db = await getDatabase();
+      await db.exec('DELETE FROM users WHERE id = ?', [userId]);
       setUsers(users.filter(u => u.id !== userId));
     } catch (err) {
       setError('Failed to delete user. Please try again.');
@@ -134,7 +153,7 @@ export default function UserManagement() {
   const staffUsers = users.filter(user => ['admin', 'accountant', 'staff'].includes(user.role));
   const customerUsers = users.filter(user => user.role === 'customer');
 
-  if (!currentUser?.role === 'admin') {
+  if (currentUser?.role !== 'admin') {
     return (
       <div className="text-center py-12">
         <p className="text-slate-400">You don't have permission to access this page.</p>

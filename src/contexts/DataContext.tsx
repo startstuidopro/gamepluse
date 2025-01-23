@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Product, Device, Controller, Game, Station, Session } from '../types';
-import db from '../database';
+import { getDatabase, waitForInit } from '../database';
 
 interface StationStats {
   totalRevenue: number;
@@ -31,12 +31,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [controllers, setControllers] = useState<Controller[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [stations, setStations] = useState<(Station & { currentSession?: Session; lastSession?: Session })[]>([
-    { id: 1, name: 'PS5-01', status: 'available', type: 'PS5', location: 'Station 1', pricePerMinute: 0.3 },
-    { id: 2, name: 'PS5-02', status: 'available', type: 'PS5', location: 'Station 2', pricePerMinute: 0.3 },
-    { id: 3, name: 'PS5-03', status: 'maintenance', type: 'PS5', location: 'Station 3', pricePerMinute: 0.3 },
-    { id: 4, name: 'PS4-01', status: 'available', type: 'PS4', location: 'Station 4', pricePerMinute: 0.2 },
-    { id: 5, name: 'Xbox-01', status: 'available', type: 'Xbox Series X', location: 'Station 5', pricePerMinute: 0.3 },
-    { id: 6, name: 'Switch-01', status: 'available', type: 'Nintendo Switch', location: 'Station 6', pricePerMinute: 0.2 }
+    { id: 1, name: 'PS5-01', status: 'available', type: 'PS5', location: 'Station 1', price_per_minute: 0.3 },
+    { id: 2, name: 'PS5-02', status: 'available', type: 'PS5', location: 'Station 2', price_per_minute: 0.3 },
+    { id: 3, name: 'PS5-03', status: 'maintenance', type: 'PS5', location: 'Station 3', price_per_minute: 0.3 },
+    { id: 4, name: 'PS4-01', status: 'available', type: 'PS4', location: 'Station 4', price_per_minute: 0.2 },
+    { id: 5, name: 'Xbox-01', status: 'available', type: 'Xbox Series X', location: 'Station 5', price_per_minute: 0.3 },
+    { id: 6, name: 'Switch-01', status: 'available', type: 'Nintendo Switch', location: 'Station 6', price_per_minute: 0.2 }
   ]);
   const [stationStats, setStationStats] = useState<StationStats>({
     totalRevenue: 0,
@@ -47,15 +47,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   const calculateSessionCost = (session: Session): number => {
-    const startTime = new Date(session.startTime).getTime();
-    const endTime = new Date(session.endTime || new Date()).getTime();
-    const durationMinutes = (endTime - startTime) / (1000 * 60);
-    return durationMinutes * session.pricePerMinute;
+    const start_time = new Date(session.start_time).getTime();
+    const end_time = new Date(session.end_time || new Date()).getTime();
+    const durationMinutes = (end_time - start_time) / (1000 * 60);
+    return durationMinutes * session.price_per_minute;
   };
 
   const updateStationStats = (session: Session) => {
-    const duration = session.endTime 
-      ? (new Date(session.endTime).getTime() - new Date(session.startTime).getTime()) / 1000 / 60 
+    const duration = session.end_time
+      ? (new Date(session.end_time).getTime() - new Date(session.start_time).getTime()) / 1000 / 60
       : 0;
 
     const totalAmount = calculateSessionCost(session);
@@ -99,44 +99,90 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const loadData = async () => {
     try {
-      await db.waitForInit();
+      await waitForInit();
+      const db = await getDatabase();
 
+     
+      
       const [
-        usersData,
-        productsData,
-        devicesData,
-        controllersData,
-        gamesData
+        usersResult,
+        productsResult,
+        devicesResult,
+        controllersResult,
+        gamesResult
       ] = await Promise.all([
-        db.query<User>(`
-          SELECT id, name, phone, role, membership_type as membershipType, 
-          credit, last_active as lastActive FROM users
-        `),
-        db.query<Product>('SELECT * FROM products'),
-        db.query<Device>(`
-          SELECT id, name, type, status, location, 
-          price_per_minute as pricePerMinute FROM devices
-        `),
-        db.query<Controller>(`
-          SELECT id, name, type, status, price_per_minute as pricePerMinute, 
-          color FROM controllers
-        `),
-        db.query<Game>(`
-          SELECT id, name, price_per_minute as pricePerMinute, image, 
-          device_types as deviceTypes, is_multiplayer as isMultiplayer 
-          FROM games
-        `)
+        db.exec(`SELECT * FROM users`),
+        db.exec('SELECT * FROM products'),
+        db.exec('SELECT * FROM devices'),
+        db.exec('SELECT * FROM controllers'),
+        db.exec('SELECT * FROM games')
       ]);
+
+      // Convert query results to typed objects
+      const usersData = usersResult[0]?.values.map(row => ({
+        id: row[0],
+        name: row[1],
+        phone: row[2],
+        password_hash: row[3],
+        role: row[4],
+        membership_type: row[5],
+        credit: row[6],
+        last_active: row[7],
+        created_at: row[8],
+        updated_at: row[9]
+      })) as User[];
+
+      const productsData = productsResult[0]?.values.map(row => ({
+        id: row[0],
+        name: row[1],
+        price: row[2],
+        cost: row[3],
+        category: row[4],
+        image: row[5],
+        stock: row[6],
+        barcode: row[7],
+        created_at: row[8],
+        updated_at: row[9]
+      })) as Product[];
+
+      const devicesData = devicesResult[0]?.values.map(row => ({
+        id: row[0],
+        name: row[1],
+        type: row[2],
+        status: row[3],
+        location: row[4],
+        price_per_minute: row[5],
+        created_at: row[6],
+        updated_at: row[7]
+      })) as Device[];
+
+      const controllersData = controllersResult[0]?.values.map(row => ({
+        id: row[0],
+        name: row[1],
+        type: row[2],
+        status: row[3],
+        price_per_minute: row[4],
+        color: row[5],
+        created_at: row[6],
+        updated_at: row[7]
+      })) as Controller[];
+
+      const gamesData = gamesResult[0]?.values.map(row => ({
+        id: row[0],
+        name: row[1],
+        price_per_minute: row[2],
+        image: row[3],
+        is_multiplayer: Boolean(row[4]),
+        created_at: row[5],
+        updated_at: row[6],
+        compatible_devices: row[4] ? JSON.parse(row[4] as string) : []
+      })) as Game[];
 
       setUsers(usersData);
       setProducts(productsData);
       setDevices(devicesData);
       setControllers(controllersData);
-      setGames(gamesData.map(game => ({
-        ...game,
-        deviceTypes: JSON.parse(game.deviceTypes as string),
-        isMultiplayer: Boolean(game.isMultiplayer)
-      })));
+      setGames(gamesData);
 
       setError(null);
     } catch (error) {

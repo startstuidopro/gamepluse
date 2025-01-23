@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
-import db from '../database';
+import { getDatabase, waitForInit } from '../database';
 
 interface AuthContextType {
   user: User | null;
@@ -23,14 +23,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const savedUserId = localStorage.getItem('userId');
     if (savedUserId) {
       try {
-        await db.waitForInit();
-        const user = await db.get<User>(`
-          SELECT id, name, phone, role, membership_type as membershipType, 
-          credit, last_active as lastActive 
-          FROM users WHERE id = ?
+        await waitForInit();
+        const db = await getDatabase();
+        const userResult = await db.exec(`
+          SELECT * FROM users WHERE id = ?
         `, [savedUserId]);
         
-        if (user) {
+        if (userResult[0]?.values.length > 0) {
+          const userData = userResult[0].values[0];
+          const user = {
+            id: userData[0],
+            name: userData[1],
+            phone: userData[2],
+            role: userData[3],
+            membership_type: userData[4],
+            credit: userData[5],
+            last_active: userData[6],
+            created_at: userData[7],
+            updated_at: userData[8]
+          } as User;
           setUser(user);
         }
       } catch (error) {
@@ -44,9 +55,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (phone: string, password: string) => {
     try {
       setError(null);
-      await db.waitForInit();
-      
-      const user = await db.get<User>(`
+      await waitForInit();
+      const database = await getDatabase();
+      const userResult = await database.exec(`
         SELECT id, name, phone, role, membership_type as membershipType, 
         credit, last_active as lastActive
         FROM users WHERE phone = ? AND password_hash = ?
@@ -56,7 +67,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Invalid phone number or password');
       }
 
-      await db.run(
+      const db = await getDatabase();
+      await db.exec(
         'UPDATE users SET last_active = CURRENT_TIMESTAMP WHERE id = ?',
         [user.id]
       );

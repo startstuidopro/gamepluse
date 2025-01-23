@@ -20,6 +20,7 @@ export interface Session {
   discount_rate: number;
   final_price: number;
   total_amount?: number;
+  price_per_minute: number;
   attached_controllers?: Controller[];
   user_membership_type?: 'standard' | 'premium';
   game?: Game;

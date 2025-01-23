@@ -3,14 +3,14 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
 import { DataProvider } from './contexts/DataContext';
-import db from './database';
+import { waitForInit } from './database';
 import './index.css';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('Root element not found');
 
 // Initialize database before rendering
-db.waitForInit().then(() => {
+waitForInit().then(() => {
   createRoot(rootElement).render(
     <StrictMode>
       <AuthProvider>
@@ -20,7 +20,7 @@ db.waitForInit().then(() => {
       </AuthProvider>
     </StrictMode>
   );
-}).catch(error => {
+}).catch((error: Error) => {
   console.error('Failed to initialize application:', error);
   // Show error message to user
   const errorElement = document.createElement('div');
