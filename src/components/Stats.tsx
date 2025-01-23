@@ -2,14 +2,19 @@ import React from 'react';
 import { Users, Clock, DollarSign, Power } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-export default function Stats() {
+interface StatsProps {
+  totalRevenue?: number;
+  averageSessionTime?: number;
+}
+
+export default function Stats({ totalRevenue = 0, averageSessionTime = 0 }: StatsProps) {
   const { user, isAdmin } = useAuth();
   
   // Simulated stats - in production, fetch from API
   const userStats = {
     activeSessions: '8',
-    averageSession: '2.5h',
-    todayRevenue: isAdmin ? '$580' : '$45', // Show all revenue for admin, user-specific for others
+    averageSession: averageSessionTime ? `${(averageSessionTime / 60).toFixed(1)}h` : '2.5h',
+    todayRevenue: isAdmin ? `$${totalRevenue.toFixed(2)}` : '$45', // Show all revenue for admin, user-specific for others
     availableStations: '4'
   };
 

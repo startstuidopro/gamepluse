@@ -1,9 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
+import db from '../database';
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<void>;
+  isLoading: boolean;
+  error: string | null;
+  login: (phone: string, password: string) => Promise<void>;
   logout: () => void;
   isAdmin: boolean;
 }
@@ -12,56 +15,71 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const isAdmin = user?.role === 'admin';
 
-  // Simulated user data - in production, this would come from your backend
-  const users: User[] = [
-    {
-      id: 1,
-      name: 'Admin User',
-      email: 'admin@example.com',
-      role: 'admin',
-      membershipType: 'premium',
-      lastActive: new Date().toISOString(),
-    },
-    {
-      id: 2,
-      name: 'Staff User',
-      email: 'staff@example.com',
-      role: 'staff',
-      membershipType: 'standard',
-      lastActive: new Date().toISOString(),
+  const loadUser = async () => {
+    const savedUserId = localStorage.getItem('userId');
+    if (savedUserId) {
+      try {
+        await db.waitForInit();
+        const user = await db.get<User>(`
+          SELECT id, name, phone, role, membership_type as membershipType, 
+          credit, last_active as lastActive 
+          FROM users WHERE id = ?
+        `, [savedUserId]);
+        
+        if (user) {
+          setUser(user);
+        }
+      } catch (error) {
+        console.error('Error loading user:', error);
+        localStorage.removeItem('userId');
+      }
     }
-  ];
+    setIsLoading(false);
+  };
 
-  const login = async (email: string, password: string) => {
-    // Simulate API call
-    const user = users.find(u => u.email === email);
-    if (!user) {
-      throw new Error('Invalid credentials');
+  const login = async (phone: string, password: string) => {
+    try {
+      setError(null);
+      await db.waitForInit();
+      
+      const user = await db.get<User>(`
+        SELECT id, name, phone, role, membership_type as membershipType, 
+        credit, last_active as lastActive
+        FROM users WHERE phone = ? AND password_hash = ?
+      `, [phone, password]);
+
+      if (!user) {
+        throw new Error('Invalid phone number or password');
+      }
+
+      await db.run(
+        'UPDATE users SET last_active = CURRENT_TIMESTAMP WHERE id = ?',
+        [user.id]
+      );
+
+      setUser(user);
+      localStorage.setItem('userId', user.id.toString());
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Login failed. Please try again.');
+      throw error;
     }
-    // In production, verify password hash here
-    if (password !== '123456') {
-      throw new Error('Invalid credentials');
-    }
-    setUser(user);
-    localStorage.setItem('user', JSON.stringify(user));
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('user');
+    localStorage.removeItem('userId');
   };
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
+    loadUser();
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAdmin }}>
+    <AuthContext.Provider value={{ user, isLoading, error, login, logout, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );

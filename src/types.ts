@@ -1,48 +1,208 @@
-export interface Product {
+export interface Station {
   id: number;
   name: string;
-  price: number;
-  category: 'drinks' | 'snacks' | 'sweets';
-  image: string;
-  stock: number;
-  cost: number;
-  barcode: string;
-}
-
-export type UserRole = 'admin' | 'accountant' | 'staff';
-
-export interface User {
-  id: number;
-  name: string;
-  email: string;
-  membershipType: 'standard' | 'premium';
-  role: UserRole;
-  avatar?: string;
-  lastActive?: string;
+  type: DeviceType;
+  status: 'available' | 'occupied' | 'maintenance';
+  location: string;
+  price_per_minute: number;
+  current_session?: Session;
+  last_session?: Session;
 }
 
 export interface Session {
   id: number;
-  stationId: number;
-  userId: string;
-  startTime: string;
-  endTime?: string;
-  game?: string;
-  pricePerMinute: number;
-  totalAmount?: number;
+  device_id: number;
+  user_id: number;
+  game_id?: number;
+  start_time: string;
+  end_time?: string;
+  base_price: number;
+  discount_rate: number;
+  final_price: number;
+  total_amount?: number;
+  attached_controllers?: Controller[];
+  user_membership_type?: 'standard' | 'premium';
+  game?: Game;
 }
 
-export interface Station {
+export interface Controller {
   id: number;
   name: string;
-  status: 'available' | 'occupied' | 'maintenance';
-  currentSession?: Session;
+  type: DeviceType;
+  status: 'available' | 'in_use' | 'maintenance'; // Align with database enum
+  price_per_minute: number;
+  color?: string;
 }
 
-export interface Sale {
+export interface Game {
   id: number;
-  products: { productId: number; quantity: number; price: number }[];
-  total: number;
-  timestamp: string;
-  staffId: number;
+  name: string;
+  price_per_minute: number;
+  image: string;
+  compatible_devices?: DeviceType[];
+  is_multiplayer: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type DeviceType =
+  'PS5' |
+  'PS4' |
+  'Xbox Series X' |
+  'Xbox One' |
+  'Nintendo Switch';
+// Existing types remain the same, adding new types for database models
+
+// User related types
+export type UserRole = 'admin' | 'staff' | 'customer';
+export type MembershipType = 'standard' | 'premium';
+
+export interface User {
+    id: number;
+    name: string;
+    phone: string;
+    password_hash?: string;
+    role: UserRole;
+    membership_type: MembershipType;
+    credit: number;
+    last_active?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
+// Device related types
+// DeviceType definition removed here since it's already defined above
+export type DeviceStatus = 'available' | 'occupied' | 'maintenance';
+
+export interface Device {
+    id: number;
+    name: string;
+    type: DeviceType;
+    status: DeviceStatus;
+    location: string;
+    price_per_minute: number;
+    created_at?: string;
+    updated_at?: string;
+}
+
+// Controller related types
+export type ControllerStatus = 'available' | 'in_use' | 'maintenance';
+
+export interface Controller {
+    id: number;
+    device_id: number;
+    identifier: string;
+    status: ControllerStatus;
+    last_maintenance: string;
+    created_at?: string;
+    updated_at?: string;
+    // Additional fields from joins
+    device_name?: string;
+    device_type?: string;
+}
+
+// Game related types
+export interface Game {
+    id: number;
+    name: string;
+    price_per_minute: number;
+    image: string;
+    is_multiplayer: boolean;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface GameDeviceCompatibility {
+    game_id: number;
+    device_type: DeviceType;
+}
+
+// Session related types
+export interface Session {
+    id: number;
+    device_id: number;
+    user_id: number;
+    game_id?: number;
+    start_time: string;
+    end_time?: string;
+    base_price: number;
+    discount_rate: number;
+    final_price: number;
+    total_amount?: number;
+    created_at?: string;
+    // Additional fields from joins
+    user_name?: string;
+    device_name?: string;
+    device_type?: string;
+    game_name?: string;
+}
+
+export interface SessionController {
+    session_id: number;
+    controller_id: number;
+}
+
+// Product related types
+export type ProductCategory = 'drinks' | 'snacks' | 'sweets';
+
+export interface Product {
+    id: number;
+    name: string;
+    price: number;
+    cost: number;
+    category: ProductCategory;
+    image: string;
+    stock: number;
+    barcode: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
+// Order related types
+export type OrderStatus = 'pending' | 'completed' | 'cancelled';
+
+export interface Order {
+    id: number;
+    user_id: number;
+    total_amount: number;
+    status: OrderStatus;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface OrderItem {
+    id: number;
+    order_id: number;
+    product_id: number;
+    quantity: number;
+    price_per_unit: number;
+    total_price: number;
+    // Additional fields from joins
+    product_name?: string;
+}
+
+// Discount related types
+export type DiscountType = 'devices' | 'games' | 'controllers' | 'products';
+
+export interface DiscountConfig {
+    id: number;
+    membership_type: MembershipType;
+    discount_type: DiscountType;
+    discount_rate: number;
+    created_at?: string;
+    updated_at?: string;
+}
+
+// Database model types for query results
+export interface DBResult {
+    changes: number;
+    lastInsertRowid: number;
+}
+
+export interface QueryResult<T> {
+    success: boolean;
+    data?: T | T[];
+    error?: string;
+    changes?: number;
+    lastInsertId?: number;
 }

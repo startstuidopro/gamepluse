@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DataModels>
+    <Model name="Controller">
+        <Properties>
+            <Property name="id" type="string" />
+            <Property name="name" type="string" />
+            <Property name="price" type="number" />
+            <Property name="description" type="string" />
+            <Property name="image" type="string" />
+            <Property name="type" type="string" />
+        </Properties>
+    </Model>
+    <Model name="Device">
+        <Properties>
+            <Property name="id" type="string" />
+            <Property name="name" type="string" />
+            <Property name="type" type="string" />
+            <Property name="status" type="string" />
+            <Property name="gameTime" type="number" />
+        </Properties>
+    </Model>
+    <Model name="Discount">
+        <Properties>
+            <Property name="id" type="string" />
+            <Property name="code" type="string" />
+            <Property name="percentage" type="number" />
+            <Property name="validUntil" type="Date" />
+        </Properties>
+    </Model>
+    <Model name="Game">
+        <Properties>
+            <Property name="id" type="string" />
+            <Property name="name" type="string" />
+            <Property name="description" type="string" />
+            <Property name="image" type="string" />
+            <Property name="price" type="number" />
+            <Property name="category" type="string" />
+        </Properties>
+    </Model>
+    <Model name="Order">
+        <Properties>
+            <Property name="id" type="string" />
+            <Property name="userId" type="string" />
+            <Property name="items" type="array" />
+            <Property name="total" type="number" />
+            <Property name="status" type="string" />
+            <Property name="createdAt" type="Date" />
+            <Property name="updatedAt" type="Date" />
+        </Properties>
+    </Model>
+    <Model name="Product">
+        <Properties>
+            <Property name="id" type="string" />
+            <Property name="name" type="string" />
+            <Property name="description" type="string" />
+            <Property name="price" type="number" />
+            <Property name="image" type="string" />
+            <Property name="category" type="string" />
+        </Properties>
+    </Model>
+    <Model name="Session">
+        <Properties>
+            <Property name="id" type="string" />
+            <Property name="userId" type="string" />
+            <Property name="deviceId" type="string" />
+            <Property name="startTime" type="Date" />
+            <Property name="endTime" type="Date" />
+            <Property name="duration" type="number" />
+            <Property name="status" type="string" />
+        </Properties>
+    </Model>
+    <Model name="User">
+        <Properties>
+            <Property name="id" type="string" />
+            <Property name="username" type="string" />
+            <Property name="email" type="string" />
+            <Property name="password" type="string" />
+            <Property name="role" type="string" />
+            <Property name="credits" type="number" />
+            <Property name="createdAt" type="Date" />
+            <Property name="updatedAt" type="Date" />
+        </Properties>
+    </Model>
+</DataModels>

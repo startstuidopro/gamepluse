@@ -1,19 +1,22 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { LogIn } from 'lucide-react';
+import { LogIn, AlertCircle } from 'lucide-react';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const { login } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const { login, error } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await login(email, password);
+      setIsLoading(true);
+      await login(phone, password);
     } catch (err) {
-      setError('Invalid credentials');
+      // Error is handled by AuthContext
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -28,23 +31,26 @@ export default function Login() {
         </div>
 
         {error && (
-          <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-2 rounded-lg mb-6">
-            {error}
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-lg mb-6 flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 flex-shrink-0" />
+            <p>{error}</p>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-slate-400 mb-1">
-              Email
+            <label htmlFor="phone" className="block text-sm font-medium text-slate-400 mb-1">
+              Phone Number
             </label>
             <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="tel"
+              id="phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
               className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500"
               required
+              placeholder="+1234567890"
+              disabled={isLoading}
             />
           </div>
 
@@ -59,21 +65,32 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500"
               required
+              disabled={isLoading}
             />
           </div>
 
           <button
             type="submit"
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition"
+            className={`w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition flex items-center justify-center ${
+              isLoading ? 'opacity-75 cursor-not-allowed' : ''
+            }`}
+            disabled={isLoading}
           >
-            Sign In
+            {isLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
+                Signing In...
+              </>
+            ) : (
+              'Sign In'
+            )}
           </button>
         </form>
 
         <div className="mt-6 text-center text-sm text-slate-400">
           Demo credentials:<br />
-          Admin: admin@example.com<br />
-          Staff: staff@example.com<br />
+          Admin: +1234567890<br />
+          Staff: +1987654321<br />
           Password: 123456
         </div>
       </div>

@@ -55,7 +55,7 @@ export default function StaffList({ users, onEdit, onDelete }: StaffListProps) {
                       {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                     </span>
                   </h3>
-                  <p className="text-slate-400">{user.email}</p>
+                  <p className="text-slate-400">{user.phone}</p>
                   <p className="text-sm text-slate-500 mt-1">
                     Last active: {new Date(user.lastActive || '').toLocaleString()}
                   </p>

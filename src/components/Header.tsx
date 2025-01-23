@@ -1,10 +1,10 @@
 import React from 'react';
-import { Gamepad2, ShoppingCart, Users, LogOut } from 'lucide-react';
+import { Gamepad2, ShoppingCart, Users, LogOut, Monitor, Gamepad, Percent } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface HeaderProps {
-  activeTab: 'stations' | 'shop' | 'users';
-  onTabChange: (tab: 'stations' | 'shop' | 'users') => void;
+  activeTab: 'stations' | 'shop' | 'users' | 'devices' | 'games' | 'controllers' | 'discounts';
+  onTabChange: (tab: 'stations' | 'shop' | 'users' | 'devices' | 'games' | 'controllers' | 'discounts') => void;
 }
 
 export default function Header({ activeTab, onTabChange }: HeaderProps) {
@@ -40,15 +40,53 @@ export default function Header({ activeTab, onTabChange }: HeaderProps) {
               Shop
             </button>
             {user?.role === 'admin' && (
-              <button 
-                onClick={() => onTabChange('users')}
-                className={`flex items-center gap-2 transition ${
-                  activeTab === 'users' ? 'text-white' : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                <Users className="h-5 w-5" />
-                Users
-              </button>
+              <>
+                <button 
+                  onClick={() => onTabChange('users')}
+                  className={`flex items-center gap-2 transition ${
+                    activeTab === 'users' ? 'text-white' : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <Users className="h-5 w-5" />
+                  Users
+                </button>
+                <button 
+                  onClick={() => onTabChange('devices')}
+                  className={`flex items-center gap-2 transition ${
+                    activeTab === 'devices' ? 'text-white' : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <Monitor className="h-5 w-5" />
+                  Devices
+                </button>
+                <button 
+                  onClick={() => onTabChange('games')}
+                  className={`flex items-center gap-2 transition ${
+                    activeTab === 'games' ? 'text-white' : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <Gamepad2 className="h-5 w-5" />
+                  Games
+                </button>
+                <button 
+                  onClick={() => onTabChange('controllers')}
+                  className={`flex items-center gap-2 transition ${
+                    activeTab === 'controllers' ? 'text-white' : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <Gamepad className="h-5 w-5" />
+                  Controllers
+                </button>
+                <button 
+                  onClick={() => onTabChange('discounts')}
+                  className={`flex items-center gap-2 transition ${
+                    activeTab === 'discounts' ? 'text-white' : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <Percent className="h-5 w-5" />
+                  Discounts
+                </button>
+              </>
             )}
           </nav>
           <div className="flex items-center gap-4 pl-6 border-l border-slate-700">

@@ -1,6 +1,7 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
 import { Product } from '../../types';
-import { Package } from 'lucide-react';
+import { Package, Loader2 } from 'lucide-react';
+import { productService } from '../../services/productService';
 
 interface ProductGridProps {
   onAddToCart: (product: Product) => void;
@@ -8,36 +9,45 @@ interface ProductGridProps {
 }
 
 export default function ProductGrid({ onAddToCart, showStock = false }: ProductGridProps) {
-  const products: Product[] = [
-    { 
-      id: 1, 
-      name: 'Coca Cola', 
-      price: 2.50, 
-      cost: 1.20,
-      category: 'drinks', 
-      image: 'https://images.unsplash.com/photo-1629203851122-3726ecdf080e?w=150',
-      stock: 24
-    },
-    { 
-      id: 2, 
-      name: 'Doritos', 
-      price: 3.00, 
-      cost: 1.50,
-      category: 'snacks', 
-      image: 'https://images.unsplash.com/photo-1600952841320-db92ec4047ca?w=150',
-      stock: 15
-    },
-    { 
-      id: 3, 
-      name: 'M&Ms', 
-      price: 2.00, 
-      cost: 1.00,
-      category: 'sweets', 
-      image: 'https://images.unsplash.com/photo-1581798459219-318e76aecc7b?w=150',
-      stock: 30
-    },
-    // ... other products
-  ];
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
+  const loadProducts = async () => {
+    try {
+      setLoading(true);
+      const result = await productService.getProducts();
+      if (result.success && Array.isArray(result.data)) {
+        setProducts(result.data);
+      } else {
+        setError(result.error || 'Failed to load products');
+      }
+    } catch (err) {
+      setError('Failed to load products');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-red-500 bg-red-100 border border-red-300 rounded-lg p-4">
+        {error}
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -50,38 +60,28 @@ export default function ProductGrid({ onAddToCart, showStock = false }: ProductG
               alt={product.name}
               className="w-full h-48 object-cover rounded-lg mb-4"
             />
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-white">{product.name}</h3>
-                <span className="text-sm text-slate-400 capitalize">{product.category}</span>
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold text-white">{product.name}</h3>
+              <div className="flex items-center justify-between">
+                <span className="text-green-400 font-bold">${product.price.toFixed(2)}</span>
                 {showStock && (
-                  <div className="flex items-center gap-1 mt-1 text-sm">
-                    <Package className="h-4 w-4 text-slate-400" />
-                    <span className={`${
-                      product.stock > 10 
-                        ? 'text-green-400' 
-                        : product.stock > 0 
-                        ? 'text-yellow-400' 
-                        : 'text-red-400'
-                    }`}>
-                      {product.stock} in stock
-                    </span>
-                  </div>
+                  <span className="text-slate-400">
+                    Stock: {product.stock}
+                  </span>
                 )}
               </div>
-              <span className="text-lg font-bold text-purple-400">${product.price.toFixed(2)}</span>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-400">{product.category}</span>
+                <span className="text-xs text-slate-500">#{product.barcode}</span>
+              </div>
+              <button
+                onClick={() => onAddToCart(product)}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition flex items-center justify-center gap-2"
+              >
+                <Package className="w-4 h-4" />
+                Add to Cart
+              </button>
             </div>
-            <button
-              onClick={() => onAddToCart(product)}
-              disabled={product.stock === 0}
-              className={`w-full py-2 px-4 rounded-lg transition ${
-                product.stock === 0
-                  ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
-                  : 'bg-purple-600 hover:bg-purple-700 text-white'
-              }`}
-            >
-              {product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
-            </button>
           </div>
         ))}
       </div>

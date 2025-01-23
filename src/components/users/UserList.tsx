@@ -1,6 +1,6 @@
 import React from 'react';
 import { User } from '../../types';
-import { Pencil, Trash2, Crown } from 'lucide-react';
+import { Pencil, Trash2, Crown, Wallet } from 'lucide-react';
 
 interface UserListProps {
   users: User[];
@@ -31,7 +31,11 @@ export default function UserList({ users, onEdit, onDelete }: UserListProps) {
                     <Crown className="h-4 w-4 text-yellow-500" />
                   )}
                 </h3>
-                <p className="text-slate-400">{user.email}</p>
+                <p className="text-slate-400">{user.phone}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Wallet className="h-4 w-4 text-green-500" />
+                  <span className="text-green-400">${user.credit.toFixed(2)}</span>
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-2">

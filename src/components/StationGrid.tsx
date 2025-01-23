@@ -1,26 +1,36 @@
-import React, { useState } from 'react';
-import { PlaySquare, Timer, DollarSign } from 'lucide-react';
-import { Station, Session } from '../types';
+import  { useState, useEffect } from 'react';
+import { PlaySquare } from 'lucide-react';
+import { Session, Game } from '../types';
+import type { Station } from '../types';
+import { gameService } from '../services/gameService';
 import SessionControl from './SessionControl';
+import SessionTimer from './SessionTimer';
+import SessionSummary from './SessionSummary';
+import { useData } from '../contexts/DataContext';
 
 export default function StationGrid() {
-  const [stations, setStations] = useState<Station[]>([
-    { id: 1, name: 'PS5-01', status: 'occupied', currentSession: { id: 1, stationId: 1, userId: 'Alex M.', startTime: new Date(Date.now() - 5400000).toISOString(), game: 'God of War Ragnarök', pricePerMinute: 0.5 } },
-    { id: 2, name: 'PS5-02', status: 'available' },
-    { id: 3, name: 'PS5-03', status: 'occupied', currentSession: { id: 2, stationId: 3, userId: 'Sarah K.', startTime: new Date(Date.now() - 2700000).toISOString(), game: 'Spider-Man 2', pricePerMinute: 0.5 } },
-    { id: 4, name: 'PS5-04', status: 'maintenance' },
-    { id: 5, name: 'PS5-05', status: 'occupied', currentSession: { id: 3, stationId: 5, userId: 'John D.', startTime: new Date(Date.now() - 8100000).toISOString(), game: 'FC 24', pricePerMinute: 0.5 } },
-    { id: 6, name: 'PS5-06', status: 'available' },
-    { id: 7, name: 'PS5-07', status: 'occupied', currentSession: { id: 4, stationId: 7, userId: 'Mike R.', startTime: new Date(Date.now() - 1800000).toISOString(), game: 'Mortal Kombat 1', pricePerMinute: 0.5 } },
-    { id: 8, name: 'PS5-08', status: 'available' },
-    { id: 9, name: 'PS5-09', status: 'occupied', currentSession: { id: 5, stationId: 9, userId: 'Emma S.', startTime: new Date(Date.now() - 4500000).toISOString(), game: 'Final Fantasy XVI', pricePerMinute: 0.5 } },
-    { id: 10, name: 'PS5-10', status: 'available' },
-    { id: 11, name: 'PS5-11', status: 'maintenance' },
-    { id: 12, name: 'PS5-12', status: 'occupied', currentSession: { id: 6, stationId: 12, userId: 'Chris P.', startTime: new Date(Date.now() - 3300000).toISOString(), game: 'NBA 2K24', pricePerMinute: 0.5 } },
-  ]);
-
+  const { stations,  updateStationSession } = useData();
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [showSessionControl, setShowSessionControl] = useState(false);
+  const [games, setGames] = useState<Game[]>([]);
+  const [_ , setLoadingGames] = useState(true);
+
+  useEffect(() => {
+    const loadGames = async () => {
+      try {
+        const result = await gameService.getGames();
+        if (result.success && result.data) {
+          setGames(Array.isArray(result.data) ? result.data.flat() : []);
+        }
+      } catch (error) {
+        console.error('Failed to load games:', error);
+      } finally {
+        setLoadingGames(false);
+      }
+    };
+
+    loadGames();
+  }, []);
 
   const getStatusColor = (status: Station['status']) => {
     switch (status) {
@@ -33,36 +43,13 @@ export default function StationGrid() {
     }
   };
 
-  const calculateTimeLeft = (startTime: string) => {
-    const start = new Date(startTime).getTime();
-    const now = Date.now();
-    const diff = Math.floor((now - start) / 1000 / 60);
-    return `${Math.floor(diff / 60)}:${(diff % 60).toString().padStart(2, '0')}`;
-  };
-
-  const calculateCurrentAmount = (startTime: string, pricePerMinute: number) => {
-    const start = new Date(startTime).getTime();
-    const now = Date.now();
-    const minutesElapsed = Math.floor((now - start) / 1000 / 60);
-    return (minutesElapsed * pricePerMinute).toFixed(2);
-  };
-
   const handleStationClick = (station: Station) => {
     setSelectedStation(station);
     setShowSessionControl(true);
   };
 
   const handleSessionUpdate = (stationId: number, session: Session | undefined) => {
-    setStations(stations.map(station => {
-      if (station.id === stationId) {
-        return {
-          ...station,
-          status: session ? 'occupied' : 'available',
-          currentSession: session
-        };
-      }
-      return station;
-    }));
+    updateStationSession(stationId, session);
     setShowSessionControl(false);
   };
 
@@ -81,40 +68,38 @@ export default function StationGrid() {
               <div>
                 <h3 className="text-lg font-semibold text-white">{station.name}</h3>
                 <span className="text-sm capitalize">{station.status}</span>
+                <p className="text-sm text-slate-400 mt-1">{station.type}</p>
+                <p className="text-sm text-slate-400">{station.location}</p>
+                <p className="text-sm text-slate-400">Base Price: ${station?.price_per_minute?.toFixed(2) ?? '0.00'}/min</p>
               </div>
               <PlaySquare className="h-6 w-6" />
             </div>
 
             {station.status === 'occupied' && station.currentSession && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Timer className="h-4 w-4 text-slate-400" />
-                  <span className="text-sm text-slate-300">
-                    {calculateTimeLeft(station.currentSession.startTime)} elapsed
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-slate-400" />
-                  <span className="text-sm text-slate-300">
-                    ${calculateCurrentAmount(station.currentSession.startTime, station.currentSession.pricePerMinute)}
-                  </span>
-                </div>
+              <div className="space-y-3 mb-4">
+                <SessionTimer session={station.currentSession} />
                 <div className="space-y-1">
-                  <p className="text-sm text-slate-400">User: {station.currentSession.userId}</p>
-                  <p className="text-sm text-slate-400">Game: {station.currentSession.game}</p>
+                  <p className="text-sm text-slate-400">User: {station.currentSession.user_id}</p>
+                  <p className="text-sm text-slate-400">Game: {station.currentSession.game?.name}</p>
+                  {station.currentSession.attached_controllers && station.currentSession.attached_controllers.length > 0 && (
+                    <p className="text-sm text-slate-400">
+                      Controllers: {station.currentSession.attached_controllers.length}
+                    </p>
+                  )}
                 </div>
               </div>
             )}
 
             <button
               onClick={() => handleStationClick(station)}
-              className={`w-full mt-4 py-2 px-4 rounded-lg font-medium transition
+              disabled={station.status === 'maintenance'}
+              className={`w-full py-2 px-4 rounded-lg font-medium transition
                 ${
                   station.status === 'available'
                     ? 'bg-green-500 hover:bg-green-600 text-white'
                     : station.status === 'occupied'
                     ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                    : 'bg-red-500 hover:bg-red-600 text-white'
+                    : 'bg-red-500 hover:bg-red-600 text-white cursor-not-allowed'
                 }
               `}
             >
@@ -124,6 +109,10 @@ export default function StationGrid() {
                 ? 'End Session'
                 : 'Under Maintenance'}
             </button>
+
+            {station.lastSession && (
+              <SessionSummary session={station.lastSession} />
+            )}
           </div>
         ))}
       </div>
@@ -133,6 +122,7 @@ export default function StationGrid() {
           station={selectedStation}
           onClose={() => setShowSessionControl(false)}
           onUpdateSession={handleSessionUpdate}
+          games={games.filter(game => game.compatible_devices?.includes(selectedStation.type))}
         />
       )}
     </div>
