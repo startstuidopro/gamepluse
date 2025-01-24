@@ -1,18 +1,17 @@
-import React, { useState } from 'react';
+import  { useState } from 'react';
 import ProductGrid from './ProductGrid';
 import Cart from './Cart';
 import { Product } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import InventoryManager from './InventoryManager';
 import BarcodeScanner from './BarcodeScanner';
-import { Plus, Scan } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 export default function Shop() {
   const { isAdmin } = useAuth();
   const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
   const [showInventory, setShowInventory] = useState(false);
-  const [showScanner, setShowScanner] = useState(false);
-
+  
   // Demo products with barcodes
   const products: Product[] = [
     { 
@@ -74,8 +73,7 @@ export default function Shop() {
     const product = products.find(p => p.barcode === barcode);
     if (product) {
       addToCart(product);
-      setShowScanner(false);
-    } else {
+        } else {
       alert('Product not found!');
     }
   };
@@ -103,31 +101,19 @@ export default function Shop() {
         <InventoryManager />
       ) : (
         <>
-          <div className="flex justify-end mb-6">
-            <button
-              onClick={() => setShowScanner(true)}
-              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition"
-            >
-              <Scan className="h-5 w-5" />
-              Scan Barcode
-            </button>
+          <div className="w-full mb-6">
+          <BarcodeScanner
+              onScan={handleBarcodeScan}             
+            />     
           </div>
-
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2">
               <ProductGrid onAddToCart={addToCart} showStock={isAdmin} />
             </div>
-            <div>
+            <div className="lg:col-span-1 mt-14 "> 
               <Cart items={cart} onUpdateQuantity={updateQuantity} />
             </div>
-          </div>
-
-          {showScanner && (
-            <BarcodeScanner
-              onScan={handleBarcodeScan}
-              onClose={() => setShowScanner(false)}
-            />
-          )}
+          </div>               
         </>
       )}
     </div>

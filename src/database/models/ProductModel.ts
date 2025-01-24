@@ -45,9 +45,21 @@ export class ProductModel extends BaseModel {
 
     async create(product: Omit<Product, 'id' | 'created_at' | 'updated_at'>): Promise<QueryResult<number>> {
         return await this.handleQuery(async () => {
+            // Validate required fields
+            const requiredFields = ['name', 'price', 'cost', 'category', 'image', 'stock', 'barcode'];
+            const missingFields = requiredFields.filter(field => {
+                const value = product[field as keyof typeof product];
+                return value === undefined || value === null || value === '';
+            });
+
+            if (missingFields.length > 0) {
+                throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+            }
+
+            // Check for existing barcode
             const stmt = await this.prepareStatement(this.findByBarcodeStmtSql);
-            const existing = await stmt.get([product.barcode]);
-            if (existing) throw new Error('Product with this barcode already exists');
+            const existing = await stmt.get([product.barcode]);            
+            if (existing && Object.keys(existing).length > 0) throw new Error('Product with this barcode already exists');
 
             const createStmt = await this.prepareStatement(this.createStmtSql);
             const result = await createStmt.run([

@@ -262,7 +262,7 @@ export default function InventoryManager() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         {products.map(product => (
           <div
             key={product.id}
@@ -311,10 +311,7 @@ export default function InventoryManager() {
                   <Trash2 className="h-5 w-5" />
                 </button>
               </div>
-            </div>
-            <div className="mt-4 p-4 bg-white rounded-lg">
-              <ProductBarcode barcode={product.barcode} />
-            </div>
+            </div>            
           </div>
         ))}
       </div>
