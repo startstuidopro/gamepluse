@@ -20,7 +20,18 @@ export default function StationGrid() {
       try {
         const result = await gameService.getGames();
         if (result.success && result.data) {
-          setGames(Array.isArray(result.data) ? result.data.flat() : []);
+          if (Array.isArray(result.data)) {
+            const validGames = result.data.filter((g): g is Game =>
+              g && typeof g === 'object' &&
+              'id' in g && 'name' in g &&
+              'price_per_minute' in g
+            );
+            console.log('Fetched games:', validGames);
+            setGames(validGames);
+          } else {
+            console.warn('No valid games data received');
+            setGames([]);
+          }
         }
       } catch (error) {
         console.error('Failed to load games:', error);
@@ -122,7 +133,14 @@ export default function StationGrid() {
           station={selectedStation}
           onClose={() => setShowSessionControl(false)}
           onUpdateSession={handleSessionUpdate}
-          games={games.filter(game => game.compatible_devices?.includes(selectedStation.type))}
+          games={games.filter(game => {
+            try {
+              const devices = JSON.parse(game.device_types || '[]');
+              return devices.includes(selectedStation.type);
+            } catch {
+              return false;
+            }
+          })}
         />
       )}
     </div>

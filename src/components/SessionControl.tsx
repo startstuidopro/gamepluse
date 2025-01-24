@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { X, Search } from 'lucide-react';
-import { Station, Session, Game, Controller } from '../types';
+import { Station, Session, Game, Controller, DeviceType } from '../types';
+import { getDatabase } from '../database/db';
 import ControllerSelector from './ControllerSelector';
 import { PRICING_CONFIG } from '../config/pricing';
 import { TVControlService } from '../services/tvControl';
 import { sessionService } from '../services/sessionService';
-import { userService } from '../services/userService';
+// import { userService } from '../services/userService';
 
 interface SessionControlProps {
   station: Station;
@@ -15,6 +16,7 @@ interface SessionControlProps {
 }
 
 export default function SessionControl({ station, onClose, onUpdateSession, games }: SessionControlProps) {
+ 
   const [formData, setFormData] = useState({
     userId: '',
     gameId: '',
@@ -33,9 +35,28 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
 
   const loadAvailableControllers = async () => {
     try {
-      const result = await fetch('/api/controllers/available');
-      const data = await result.json();
-      setAvailableControllers(data);
+      const db = await getDatabase();
+      const result = db.exec(`
+        SELECT * FROM controllers 
+        WHERE status = 'available'
+      `);
+      
+      if (result.length > 0) {
+        const data = result[0].values.map(row => ({
+          id: Number(row[0]),
+          name: String(row[1]),
+          type: String(row[2]) as DeviceType,
+          status: (String(row[3]) === 'in-use' ? 'in_use' : String(row[3])) as 'available' | 'in_use' | 'maintenance',
+          price_per_minute: Number(row[4]),
+          color: row[5] ? String(row[5]) : undefined,
+          device_id: 0,
+          identifier: '',
+          last_maintenance: ''
+        }));
+        setAvailableControllers(data);
+      } else {
+        setAvailableControllers([]);
+      }
     } catch (err) {
       setError('Failed to load controllers');
     }
@@ -43,12 +64,19 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
 
   const checkExistingSession = async () => {
     try {
+      console.log('Checking existing session for station:', station);
+      console.log('Station ID:', station.id);
       const result = await sessionService.getActiveSession(station.id);
+      console.log('Session service result:', result);
       if (result.success && result.data) {
         const session = Array.isArray(result.data) ? result.data[0] : result.data;
+        console.log('Found active session:', session);
         onUpdateSession(station.id, session);
+      } else {
+        console.log('No active session found');
       }
     } catch (err) {
+      console.error('Error checking existing session:', err);
       setError('Failed to check existing session');
     }
   };

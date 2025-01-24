@@ -1,8 +1,25 @@
 import { BaseModel } from './BaseModel';
 import { Session, QueryResult } from '../../types';
 
-export class SessionModel extends BaseModel {
+interface SessionModelStatements {
+    createStmt: any;
+    createControllerStmt: any;
+    deleteControllerStmt: any;
+    getControllersStmt: any;
+    endSessionStmt: any;
+    getActiveSessionStmt: any;
+}
+
+export class SessionModel extends BaseModel implements SessionModelStatements {
     private static instance: SessionModel;
+
+    // Declare statement properties with proper types
+    createStmt!: any;
+    createControllerStmt!: any;
+    deleteControllerStmt!: any;
+    getControllersStmt!: any;
+    endSessionStmt!: any;
+    getActiveSessionStmt!: any;
 
     private constructor() {
         super('sessions');
@@ -19,52 +36,72 @@ export class SessionModel extends BaseModel {
         return SessionModel.instance;
     }
 
-    // Prepared statements
-    private createStmt: any;
-    private createControllerStmt: any;
-    private deleteControllerStmt: any;
-    private getControllersStmt: any;
-    private endSessionStmt: any;
-    private getActiveSessionStmt: any;
-
     private async initStatements() {
-        this.createStmt = await this.prepareStatement(`
-            INSERT INTO sessions (device_id, user_id, game_id, start_time, base_price, discount_rate, final_price)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        `);
-        
-        this.createControllerStmt = await this.prepareStatement(`
-            INSERT INTO session_controllers (session_id, controller_id) VALUES (?, ?)
-        `);
-        
-        this.deleteControllerStmt = await this.prepareStatement(`
-            DELETE FROM session_controllers WHERE session_id = ?
-        `);
-        
-        this.getControllersStmt = await this.prepareStatement(`
-            SELECT c.* FROM controllers c
-            JOIN session_controllers sc ON c.id = sc.controller_id
-            WHERE sc.session_id = ?
-        `);
-        
-        this.endSessionStmt = await this.prepareStatement(`
-            UPDATE sessions
-            SET end_time = ?, total_amount = ?
-            WHERE id = ? AND end_time IS NULL
-        `);
-        
-        this.getActiveSessionStmt = await this.prepareStatement(`
-            SELECT s.*,
-                   u.name as user_name,
-                   d.name as device_name,
-                   d.type as device_type,
-                   g.name as game_name
-            FROM sessions s
-            LEFT JOIN users u ON s.user_id = u.id
-            LEFT JOIN devices d ON s.device_id = d.id
-            LEFT JOIN games g ON s.game_id = g.id
-            WHERE s.end_time IS NULL AND s.device_id = ?
-        `);
+        try {
+            interface StatementConfig {
+                name: keyof SessionModelStatements;
+                sql: string;
+            }
+
+            const statements: StatementConfig[] = [
+                {
+                    name: 'createStmt',
+                    sql: `INSERT INTO sessions (device_id, user_id, game_id, start_time, base_price, discount_rate, final_price)
+                          VALUES (?, ?, ?, ?, ?, ?, ?)`
+                },
+                {
+                    name: 'createControllerStmt',
+                    sql: `INSERT INTO session_controllers (session_id, controller_id) VALUES (?, ?)`
+                },
+                {
+                    name: 'deleteControllerStmt',
+                    sql: `DELETE FROM session_controllers WHERE session_id = ?`
+                },
+                {
+                    name: 'getControllersStmt',
+                    sql: `SELECT c.* FROM controllers c
+                          JOIN session_controllers sc ON c.id = sc.controller_id
+                          WHERE sc.session_id = ?`
+                },
+                {
+                    name: 'endSessionStmt',
+                    sql: `UPDATE sessions
+                          SET end_time = ?, total_amount = ?
+                          WHERE id = ? AND end_time IS NULL`
+                },
+                {
+                    name: 'getActiveSessionStmt',
+                    sql: `SELECT s.*,
+                                 u.name as user_name,
+                                 d.name as device_name,
+                                 d.type as device_type,
+                                 g.name as game_name
+                          FROM sessions s
+                          LEFT JOIN users u ON s.user_id = u.id
+                          LEFT JOIN devices d ON s.device_id = d.id
+                          LEFT JOIN games g ON s.game_id = g.id
+                          WHERE s.end_time IS NULL AND s.device_id = ?`
+                }
+            ];
+
+            // Initialize all statements in parallel
+            await Promise.all(statements.map(async (stmt) => {
+                (this as any)[stmt.name] = await this.prepareStatement(stmt.sql);
+                console.log(`Initialized statement: ${stmt.name}`);
+            }));
+
+            console.log('All statements initialized successfully');
+        } catch (error) {
+            console.error('Error initializing statements:', error);
+            throw error;
+        }
+    }
+
+    private async ensureStatementsInitialized() {
+        if (!this.getActiveSessionStmt || !this.getControllersStmt) {
+            console.log('Reinitializing statements...');
+            await this.initStatements();
+        }
     }
 
     async create(session: Omit<Session, 'id' | 'end_time' | 'total_amount'>, controllerIds?: number[]): Promise<QueryResult<number>> {
@@ -120,15 +157,38 @@ export class SessionModel extends BaseModel {
 
     async getActiveSession(deviceId: number): Promise<QueryResult<Session>> {
         return this.handleQuery(async () => {
-            const session = await this.getActiveSessionStmt.get(deviceId);
-            if (session) {
+            try {
+                await this.ensureStatementsInitialized();
+                
+                console.log('Fetching active session for device:', deviceId);
+                if (!this.getActiveSessionStmt) {
+                    throw new Error('getActiveSessionStmt not initialized');
+                }
+                
+                const session = await this.getActiveSessionStmt.get(deviceId);
+                
+                if (!session) {
+                    console.log('No active session found for device:', deviceId);
+                    return { success: true, data: null };
+                }
+
+                console.log('Found session:', session);
+                
+                if (!this.getControllersStmt) {
+                    throw new Error('getControllersStmt not initialized');
+                }
+                
                 const controllers = await this.getControllersStmt.all(session.id);
+                console.log('Session controllers:', controllers);
+                
                 return {
                     success: true,
                     data: { ...session, attachedControllers: controllers }
                 };
+            } catch (error) {
+                console.error('Error in getActiveSession:', error);
+                throw error;
             }
-            return { success: true, data: session };
         });
     }
 
@@ -191,15 +251,17 @@ export class SessionModel extends BaseModel {
         });
     }
 
-    async updateSessionControllers(sessionId: number, controllerIds: number[]): Promise<QueryResult<void>> {
+    async addController(sessionId: number, controllerId: number): Promise<QueryResult<void>> {
         return this.handleQuery(async () => {
-            return this.transaction(async () => {
-                await this.deleteControllerStmt.run(sessionId);
-                for (const controllerId of controllerIds) {
-                    await this.createControllerStmt.run(sessionId, controllerId);
-                }
-                return { success: true };
-            });
+            await this.createControllerStmt.run(sessionId, controllerId);
+            return { success: true };
+        });
+    }
+
+    async removeController(sessionId: number, controllerId: number): Promise<QueryResult<void>> {
+        return this.handleQuery(async () => {
+            await this.deleteControllerStmt.run(sessionId, controllerId);
+            return { success: true };
         });
     }
 

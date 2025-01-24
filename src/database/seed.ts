@@ -76,7 +76,7 @@ export async function seedDatabase(db: Database) {
       // Insert default users
       db.run(`
         INSERT INTO users (name, phone, password_hash, role, membership_type, credit, last_active)
-        VALUES 
+        VALUES
           ('Admin User', '+1234567890', '123456', 'admin', 'premium', 1000, CURRENT_TIMESTAMP),
           ('Staff User', '+1987654321', '123456', 'staff', 'standard', 500, CURRENT_TIMESTAMP)
       `);
@@ -94,7 +94,7 @@ export async function seedDatabase(db: Database) {
         db.run(`
           INSERT INTO devices (name, type, status, location, price_per_minute)
           VALUES (?, ?, ?, ?, ?)
-        `, [device.name, device.type, device.status, device.location, device.pricePerMinute]);
+        `, [device.name, device.type, device.status, device.location, device.price_per_minute]);
       }
 
       // Insert controllers
@@ -102,7 +102,7 @@ export async function seedDatabase(db: Database) {
         db.run(`
           INSERT INTO controllers (name, type, status, price_per_minute, color)
           VALUES (?, ?, ?, ?, ?)
-        `, [controller.name, controller.type, controller.status, controller.pricePerMinute, controller.color]);
+        `, [controller.name, controller.type, controller.status, controller.price_per_minute, controller.color || null]);
       }
 
       // Insert games
@@ -110,7 +110,7 @@ export async function seedDatabase(db: Database) {
         db.run(`
           INSERT INTO games (name, price_per_minute, image, device_types, is_multiplayer)
           VALUES (?, ?, ?, ?, ?)
-        `, [game.name, game.pricePerMinute, game.image, JSON.stringify(game.deviceTypes), game.isMultiplayer ? 1 : 0]);
+        `, [game.name, game.price_per_minute, game.image, JSON.stringify(game.compatible_devices), game.is_multiplayer ? 1 : 0]);
       }
     }
 

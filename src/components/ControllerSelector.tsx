@@ -38,7 +38,7 @@ export default function ControllerSelector({
                 <Gamepad className="h-5 w-5 text-purple-500" />
                 <div>
                   <p className="text-sm font-medium text-white">{controller.name}</p>
-                  <p className="text-xs text-slate-400">${controller.pricePerMinute.toFixed(2)}/min</p>
+                  <p className="text-xs text-slate-400">${(controller.price_per_minute || 0).toFixed(2)}/min</p>
                 </div>
               </div>
               <button
@@ -67,7 +67,7 @@ export default function ControllerSelector({
                   <Gamepad className="h-5 w-5 text-slate-400" />
                   <div className="text-left">
                     <p className="text-sm font-medium text-white">{controller.name}</p>
-                    <p className="text-xs text-slate-400">${controller.pricePerMinute.toFixed(2)}/min</p>
+                    <p className="text-xs text-slate-400">${controller.price_per_minute.toFixed(2)}/min</p>
                   </div>
                 </div>
                 <Plus className="h-4 w-4 text-slate-400" />

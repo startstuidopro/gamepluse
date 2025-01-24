@@ -1,5 +1,5 @@
 import { Database } from 'sql.js';
-import getDatabase from '../db';
+import { getDatabase } from '../db';
 import { QueryResult } from '../../types';
 
 export class BaseModel {

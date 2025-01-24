@@ -37,28 +37,28 @@ export const seedData = {
       type: 'PS5' as const,
       status: 'available' as const,
       location: 'Station 1',
-      pricePerMinute: 0.3
+      price_per_minute: 0.3
     },
     {
       name: 'PS5-02',
       type: 'PS5' as const,
       status: 'available' as const,
       location: 'Station 2',
-      pricePerMinute: 0.3
+      price_per_minute: 0.3
     },
     {
       name: 'PS4-01',
       type: 'PS4' as const,
       status: 'available' as const,
       location: 'Station 3',
-      pricePerMinute: 0.2
+      price_per_minute: 0.2
     },
     {
       name: 'Xbox-01',
       type: 'Xbox Series X' as const,
       status: 'available' as const,
       location: 'Station 4',
-      pricePerMinute: 0.3
+      price_per_minute: 0.3
     }
   ] as Omit<Device, 'id'>[],
 
@@ -67,28 +67,28 @@ export const seedData = {
       name: 'PS5 Controller White',
       type: 'PS5' as const,
       status: 'available' as const,
-      pricePerMinute: 0.1,
+      price_per_minute: 0.1,
       color: 'White'
     },
     {
       name: 'PS5 Controller Black',
       type: 'PS5' as const,
       status: 'available' as const,
-      pricePerMinute: 0.1,
+      price_per_minute: 0.1,
       color: 'Black'
     },
     {
       name: 'PS4 Controller',
       type: 'PS4' as const,
       status: 'available' as const,
-      pricePerMinute: 0.08,
+      price_per_minute: 0.08,
       color: 'Black'
     },
     {
       name: 'Xbox Controller',
       type: 'Xbox Series X' as const,
       status: 'available' as const,
-      pricePerMinute: 0.1,
+      price_per_minute: 0.1,
       color: 'Black'
     }
   ] as Omit<Controller, 'id'>[],
@@ -96,31 +96,31 @@ export const seedData = {
   games: [
     {
       name: 'God of War Ragnarök',
-      pricePerMinute: 0.5,
+      price_per_minute: 0.5,
       image: 'https://images.unsplash.com/photo-1616249807402-9dae436108cf?w=150',
-      deviceTypes: ['PS5', 'PS4'],
-      isMultiplayer: false
+      compatible_devices: ['PS5', 'PS4'],
+      is_multiplayer: false
     },
     {
       name: 'Spider-Man 2',
-      pricePerMinute: 0.6,
+      price_per_minute: 0.6,
       image: 'https://images.unsplash.com/photo-1608889825103-eb5ed706fc64?w=150',
-      deviceTypes: ['PS5'],
-      isMultiplayer: false
+      compatible_devices: ['PS5'],
+      is_multiplayer: false
     },
     {
       name: 'FIFA 24',
-      pricePerMinute: 0.4,
+      price_per_minute: 0.4,
       image: 'https://images.unsplash.com/photo-1493711662062-fa541adb3fc8?w=150',
-      deviceTypes: ['PS5', 'PS4', 'Xbox Series X', 'Xbox One'],
-      isMultiplayer: true
+      compatible_devices: ['PS5', 'PS4', 'Xbox Series X', 'Xbox One'],
+      is_multiplayer: true
     },
     {
       name: 'Mario Kart 8 Deluxe',
-      pricePerMinute: 0.3,
+      price_per_minute: 0.3,
       image: 'https://images.unsplash.com/photo-1612404819070-77c6da472e68?w=150',
-      deviceTypes: ['Nintendo Switch'],
-      isMultiplayer: true
+      compatible_devices: ['Nintendo Switch'],
+      is_multiplayer: true
     }
   ] as Omit<Game, 'id'>[]
 };

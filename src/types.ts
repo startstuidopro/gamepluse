@@ -40,7 +40,8 @@ export interface Game {
   name: string;
   price_per_minute: number;
   image: string;
-  compatible_devices?: DeviceType[];
+  device_types: string;
+  compatible_devices?: DeviceType[]; // Derived property
   is_multiplayer: boolean;
   created_at?: string;
   updated_at?: string;

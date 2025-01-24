@@ -2,6 +2,13 @@ import { useEffect, useState } from "react";
 import initSqlJs, { Database } from "sql.js";
 import sqliteUrl from "/assets/sql-wasm.wasm?url";
 
+
+// Seed database initialization
+async function initializeSeed(db: Database) {
+  const { seedDatabase } = await import('./seed');
+  await seedDatabase(db);
+}
+
 // Singleton database instance
 let dbInstance: Database | null = null;
 
@@ -9,7 +16,35 @@ let dbInstance: Database | null = null;
 async function initializeDatabase() {
   try {
     const SQL = await initSqlJs({ locateFile: () => sqliteUrl });
-    const db = new SQL.Database();
+    
+    let db: Database;
+    try {
+      // Try to load existing database
+      const response = await fetch('database.db');
+      if (response.ok) {
+        const buffer = await response.arrayBuffer();
+        const data = new Uint8Array(buffer);
+        try {
+          db = new SQL.Database(data);
+          // Verify database is valid by checking for a required table
+          db.exec('SELECT 1 FROM users LIMIT 1');
+        } catch (error) {
+          // If database is invalid, create new one
+          console.warn('Invalid database file, creating new database');
+          db = new SQL.Database();
+          await initializeSeed(db);
+        }
+      } else {
+        // If database file doesn't exist, create new one
+        db = new SQL.Database();
+         await initializeSeed(db);
+      }
+    } catch (error) {
+      // If any other error occurs, create new database
+      console.error('Error loading database:', error);
+      db = new SQL.Database();
+       await initializeSeed(db);
+    }
     
     // Create tables
     db.exec(`
@@ -146,6 +181,7 @@ async function initializeDatabase() {
         ('premium', 'products', 0.05);
     `);
 
+    
     dbInstance = db;
     return db;
   } catch (error) {
@@ -178,7 +214,6 @@ export async function waitForInit(): Promise<void> {
   return initPromise;
 }
 
-// React component wrapper
 const DbConnection = () => {
   const [db, setDb] = useState<Database | null>(null);
   const [error, setError] = useState<string>("");

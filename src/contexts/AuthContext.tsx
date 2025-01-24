@@ -58,23 +58,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await waitForInit();
       const database = await getDatabase();
       const userResult = await database.exec(`
-        SELECT id, name, phone, role, membership_type as membershipType, 
-        credit, last_active as lastActive
+        SELECT id, name, phone, role, password_hash, membership_type, credit, last_active
         FROM users WHERE phone = ? AND password_hash = ?
       `, [phone, password]);
-
-      if (!user) {
+      
+      if (!userResult[0]?.values?.length) {
         throw new Error('Invalid phone number or password');
       }
+
+      const userData = userResult[0].values[0];
+      const foundUser = {
+        id: userData[0],
+        name: userData[1],
+        phone: userData[2],
+        role: userData[3],
+        password_hash: userData[4],
+        membership_type: userData[5],
+        credit: userData[6],
+        last_active: userData[7]
+      } as User;
 
       const db = await getDatabase();
       await db.exec(
         'UPDATE users SET last_active = CURRENT_TIMESTAMP WHERE id = ?',
-        [user.id]
+        [foundUser.id]
       );
 
-      setUser(user);
-      localStorage.setItem('userId', user.id.toString());
+      setUser(foundUser);
+      localStorage.setItem('userId', foundUser.id.toString());
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Login failed. Please try again.');
       throw error;
