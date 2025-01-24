@@ -30,7 +30,7 @@ export interface Controller {
   id: number;
   name: string;
   type: DeviceType;
-  status: 'available' | 'in_use' | 'maintenance'; // Align with database enum
+  status: 'available' | 'in_use' | 'maintenance';
   price_per_minute: number;
   color?: string;
 }
@@ -41,7 +41,7 @@ export interface Game {
   price_per_minute: number;
   image: string;
   device_types: string;
-  compatible_devices?: DeviceType[]; // Derived property
+  compatible_devices?: DeviceType[];
   is_multiplayer: boolean;
   created_at?: string;
   updated_at?: string;
@@ -53,9 +53,7 @@ export type DeviceType =
   'Xbox Series X' |
   'Xbox One' |
   'Nintendo Switch';
-// Existing types remain the same, adding new types for database models
 
-// User related types
 export type UserRole = 'admin' | 'staff' | 'customer';
 export type MembershipType = 'standard' | 'premium';
 
@@ -72,8 +70,6 @@ export interface User {
     updated_at?: string;
 }
 
-// Device related types
-// DeviceType definition removed here since it's already defined above
 export type DeviceStatus = 'available' | 'occupied' | 'maintenance';
 
 export interface Device {
@@ -87,7 +83,6 @@ export interface Device {
     updated_at?: string;
 }
 
-// Controller related types
 export type ControllerStatus = 'available' | 'in_use' | 'maintenance';
 
 export interface Controller {
@@ -98,12 +93,10 @@ export interface Controller {
     last_maintenance: string;
     created_at?: string;
     updated_at?: string;
-    // Additional fields from joins
     device_name?: string;
     device_type?: string;
 }
 
-// Game related types
 export interface Game {
     id: number;
     name: string;
@@ -119,7 +112,6 @@ export interface GameDeviceCompatibility {
     device_type: DeviceType;
 }
 
-// Session related types
 export interface Session {
     id: number;
     device_id: number;
@@ -132,7 +124,6 @@ export interface Session {
     final_price: number;
     total_amount?: number;
     created_at?: string;
-    // Additional fields from joins
     user_name?: string;
     device_name?: string;
     device_type?: string;
@@ -144,7 +135,6 @@ export interface SessionController {
     controller_id: number;
 }
 
-// Product related types
 export type ProductCategory = 'drinks' | 'snacks' | 'sweets';
 
 export interface Product {
@@ -160,7 +150,6 @@ export interface Product {
     updated_at?: string;
 }
 
-// Order related types
 export type OrderStatus = 'pending' | 'completed' | 'cancelled';
 
 export interface Order {
@@ -179,11 +168,9 @@ export interface OrderItem {
     quantity: number;
     price_per_unit: number;
     total_price: number;
-    // Additional fields from joins
     product_name?: string;
 }
 
-// Discount related types
 export type DiscountType = 'devices' | 'games' | 'controllers' | 'products';
 
 export interface DiscountConfig {
@@ -195,16 +182,18 @@ export interface DiscountConfig {
     updated_at?: string;
 }
 
-// Database model types for query results
 export interface DBResult {
     changes: number;
     lastInsertRowid: number;
 }
 
-export interface QueryResult<T> {
+export interface QueryResult<T> extends Promise<T> {
     success: boolean;
     data?: T | T[];
     error?: string;
     changes?: number;
     lastInsertId?: number;
+    then: Promise<T>['then'];
+    catch: Promise<T>['catch'];
+    finally: Promise<T>['finally'];
 }

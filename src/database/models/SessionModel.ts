@@ -178,7 +178,15 @@ export class SessionModel extends BaseModel implements SessionModelStatements {
                     throw new Error('getControllersStmt not initialized');
                 }
                 
-                const controllers = await this.getControllersStmt.all(session.id);
+                // Reset statement before use
+                this.getControllersStmt.reset();
+                
+                // Bind parameters and execute query
+                this.getControllersStmt.bind([session.id]);
+                const controllers = [];
+                while (this.getControllersStmt.step()) {
+                    controllers.push(this.getControllersStmt.getAsObject());
+                }
                 console.log('Session controllers:', controllers);
                 
                 return {

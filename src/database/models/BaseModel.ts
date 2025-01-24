@@ -17,23 +17,25 @@ export class BaseModel {
         return this.db;
     }
 
-    protected async handleQuery<T>(callback: (db: Database) => any): Promise<QueryResult<T>> {
-        try {
-            const db = await this.getDb();
-            const result = await callback(db);
-            return {
-                success: true,
-                data: result,
-                changes: result?.changes,
-                lastInsertId: result?.lastInsertRowid
-            };
-        } catch (error) {
-            console.error(`Database error:`, error);
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : 'Unknown error'
-            };
-        }
+    protected handleQuery<T>(callback: (db: Database) => Promise<T>): Promise<QueryResult<T>> {
+        return new Promise(async (resolve, reject) => {
+            try {
+                const db = await this.getDb();
+                const result = await callback(db);
+                resolve({
+                    success: true,
+                    data: result,
+                    changes: result?.changes,
+                    lastInsertId: result?.lastInsertRowid
+                } as QueryResult<T>);
+            } catch (error) {
+                console.error(`Database error:`, error);
+                resolve({
+                    success: false,
+                    error: error instanceof Error ? error.message : 'Unknown error'
+                } as QueryResult<T>);
+            }
+        });
     }
 
     private statementCache: Map<string, {stmt: any, refCount: number}> = new Map();

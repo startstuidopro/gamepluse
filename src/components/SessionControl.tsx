@@ -53,6 +53,7 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
           identifier: '',
           last_maintenance: ''
         }));
+        console.log('Available controllers:', data);
         setAvailableControllers(data);
       } else {
         setAvailableControllers([]);
@@ -113,10 +114,16 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
           onClose();
         }
       } else {
-        setError(result.error || 'Failed to start session');
+        const errorMsg = result.error || 'Failed to start session';
+        console.error('Session creation failed:', errorMsg);
+        setError(errorMsg);
+        throw new Error(errorMsg); // Re-throw to keep modal open
       }
     } catch (err) {
-      setError('Failed to start session');
+      const errorMsg = err instanceof Error ? err.message : 'Failed to start session';
+      console.error('Error in handleStartSession:', errorMsg);
+      setError(errorMsg);
+      throw err; // Re-throw to keep modal open
     } finally {
       setLoading(false);
     }
@@ -237,7 +244,17 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
         )}
 
         {station.status === 'available' ? (
-          <form onSubmit={(e) => handleStartSession()} className="space-y-4">
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            try {
+              await handleStartSession();
+              // Only close modal if session creation was successful
+              onClose();
+            } catch (error) {
+              // Keep modal open to show error and allow user to retry
+              console.error('Session creation error:', error);
+            }
+          }} className="space-y-4">
             <div>
               <label htmlFor="userId" className="block text-sm font-medium text-slate-400 mb-1">
                 User Name
