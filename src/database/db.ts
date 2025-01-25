@@ -9,42 +9,97 @@ async function initializeSeed(db: Database) {
   await seedDatabase(db);
 }
 
+// IndexedDB storage functions
+async function saveDatabaseToStorage(db: Database): Promise<void> {
+  try {
+    const data = db.export();
+    const request = indexedDB.open('GamePlusDatabase', 1);
+    
+    await new Promise<void>((resolve, reject) => {
+      request.onupgradeneeded = (event) => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains('database')) {
+          db.createObjectStore('database');
+        }
+      };
+
+      request.onsuccess = () => {
+        const tx = request.result.transaction('database', 'readwrite');
+        const store = tx.objectStore('database');
+        store.put(data, 'sqlite');
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      };
+
+      request.onerror = () => reject(request.error);
+    });
+  } catch (error) {
+    console.error('Error saving database:', error);
+  }
+}
+
+async function loadDatabaseFromStorage(): Promise<Uint8Array | null> {
+  try {
+    const request = indexedDB.open('GamePlusDatabase', 1);
+    
+    return await new Promise((resolve, reject) => {
+      request.onupgradeneeded = (event) => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains('database')) {
+          db.createObjectStore('database');
+        }
+      };
+
+      request.onsuccess = () => {
+        const tx = request.result.transaction('database', 'readonly');
+        const store = tx.objectStore('database');
+        const getRequest = store.get('sqlite');
+        
+        getRequest.onsuccess = () => {
+          const result = getRequest.result;
+          resolve(result ? new Uint8Array(result) : null);
+        };
+        
+        getRequest.onerror = () => reject(getRequest.error);
+      };
+
+      request.onerror = () => reject(request.error);
+    });
+  } catch (error) {
+    console.error('Error loading database:', error);
+    return null;
+  }
+}
+
 // Singleton database instance
-let dbInstance: Database | null = null;
+let dbInstance: Database;
 
 // Initialize database with schema
-async function initializeDatabase() {
+async function initializeDatabase(): Promise<Database> {
   try {
     const SQL = await initSqlJs({ locateFile: () => sqliteUrl });
     
     let db: Database;
-    try {
-      // Try to load existing database
-      const response = await fetch('database.db');
-      if (response.ok) {
-        const buffer = await response.arrayBuffer();
-        const data = new Uint8Array(buffer);
-        try {
-          db = new SQL.Database(data);
-          // Verify database is valid by checking for a required table
-          db.exec('SELECT 1 FROM users LIMIT 1');
-        } catch (error) {
-          // If database is invalid, create new one
-          console.warn('Invalid database file, creating new database');
-          db = new SQL.Database();
-          await initializeSeed(db);
-        }
-      } else {
-        // If database file doesn't exist, create new one
+    // Try to load from IndexedDB
+    const savedDb = await loadDatabaseFromStorage();
+    if (savedDb) {
+      db = new SQL.Database(savedDb);
+      try {
+        // Verify database integrity
+        db.exec('SELECT 1 FROM users LIMIT 1');
+        console.log('Loaded database from browser storage');
+      } catch (error) {
+        console.warn('Invalid database in storage, creating new one');
         db = new SQL.Database();
-         await initializeSeed(db);
-        console.warn('Database file not found, creating new database');
+        await initializeSeed(db);
+        await saveDatabaseToStorage(db);
       }
-    } catch (error) {
-      // If any other error occurs, create new database
-      console.error('Error loading database:', error);
+    } else {
+      // Create fresh database
       db = new SQL.Database();
-       await initializeSeed(db);
+      await initializeSeed(db);
+      await saveDatabaseToStorage(db);
+      console.log('Created new database');
     }
     
     // Create tables

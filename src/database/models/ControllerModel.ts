@@ -196,7 +196,7 @@ export class ControllerModel extends BaseModel {
         sessionId: number
     ): Promise<QueryResult<void>> {
         return this.handleQuery(async () => {
-            return this.transaction(async (db) => {
+            return this.transaction(async () => {
                 const findStmt = await this.findByIdStmt();
                 const controller = await findStmt.get(controllerId);
                 await this.freeStatement(findStmt);
@@ -243,7 +243,7 @@ export class ControllerModel extends BaseModel {
         sessionId: number
     ): Promise<QueryResult<void>> {
         return this.handleQuery(async () => {
-            return this.transaction(async (db) => {
+            return this.transaction(async () => {
                 // Remove assignment
                 const deleteStmt = await this.prepareStatement(`
                     DELETE FROM session_controllers 

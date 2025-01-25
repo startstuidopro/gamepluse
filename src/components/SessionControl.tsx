@@ -72,7 +72,7 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
       }
 
       const result = await sessionService.getActiveSession(station.id);
-     
+     console.log("session",result);
       if (result.success && result.data) {
         const session = Array.isArray(result.data) ? result.data[0] : result.data;
      
@@ -90,24 +90,129 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
   const handleStartSession = async () => {
     setLoading(true);
     setError(null);
+    let db; // Declare db at function level
 
+    // Validate station and device_id
+    if (!station?.id || typeof station.id !== 'number') {
+      const errorMsg = `Invalid station ID: ${station?.id}. Please select a valid station.`;
+      console.error(errorMsg);
+      setError(errorMsg);
+      setLoading(false);
+      return;
+    }
     try {
+      db = await getDatabase();
+      const result = db.exec(`
+        SELECT id FROM devices 
+        WHERE id = ${station.id}
+      `);
+      
+      if (result.length === 0 || !result[0].values.length) {
+        const errorMsg = `Device with ID ${station.id} not found in database`;
+        console.error(errorMsg);
+        setError(errorMsg);
+        setLoading(false);
+        return;
+      }
+    } catch (err) {
+      const errorMsg = 'Failed to validate device';
+      console.error(errorMsg, err);
+      setError(errorMsg);
+      setLoading(false);
+      return;
+    }
+
+    
+    try {
+      // Ensure we have a valid device_id from the selected station
       const basePrice = calculateBasePrice();
       const discountRate = calculateDiscountRate();
       const finalPrice = basePrice * (1 - discountRate);
 
-      const sessionData = {
+      // Validate user ID format
+      if (!formData.userId || !/^[1-9]\d*$/.test(formData.userId)) {
+        throw new Error('Invalid User ID: Must be a positive numeric value');
+      }
+      const userId = parseInt(formData.userId);
+      
+      // Validate user exists
+      try {
+        const userCheck = await db.exec(`SELECT id, name FROM users WHERE id = ${userId}`);
+        if (!userCheck?.[0]?.values?.length) {
+          throw new Error(`User ${userId} not found - please verify the ID`);
+        }
+        const userName = userCheck[0].values[0][1];
+        console.log(`Starting session for user: ${userName} (ID: ${userId})`);
+      } catch (error) {
+        console.error('User validation error:', error);
+        throw new Error(`User validation failed: ${error instanceof Error ? error.message : 'Database error'}`);
+      }
+
+      // Validate game with enhanced checks
+      let gameId: number | undefined;
+      if (formData.gameId) {
+        const gameIdNumber = parseInt(formData.gameId);
+        if (isNaN(gameIdNumber) || gameIdNumber <= 0) {
+          throw new Error(`Invalid Game ID: ${formData.gameId} is not a valid numeric identifier`);
+        }
+
+        try {
+          const gameCheck = await db.exec(`
+            SELECT id, name, is_active 
+            FROM games 
+            WHERE id = ${gameIdNumber}
+          `);
+          
+          if (!gameCheck?.[0]?.values?.length) {
+            throw new Error(`Game ${gameIdNumber} not found in database`);
+          }
+          
+          const gameData = gameCheck[0].values[0];
+          if (!gameData[2]) { // is_active check
+            throw new Error(`Game ${gameData[1]} (ID: ${gameIdNumber}) is not active`);
+          }
+          
+          gameId = gameIdNumber;
+          console.log(`Selected game: ${gameData[1]} (ID: ${gameIdNumber})`);
+        } catch (error) {
+          console.error('Game validation error:', error);
+          throw new Error(`Game validation failed: ${error instanceof Error ? error.message : 'Database error'}`);
+        }
+      }
+
+      // Final validation before session creation
+      if (!gameId && games.length > 0) {
+        throw new Error('A game selection is required for session startup');
+      }
+
+      const sessionData: Omit<Session, 'id' | 'created_at' | 'updated_at'> = {
         device_id: station.id,
-        user_id: parseInt(formData.userId),
-        game_id: parseInt(formData.gameId),
+        user_id: userId,
+        game_id: gameId || undefined,
         start_time: new Date().toISOString(),
         base_price: basePrice,
         discount_rate: discountRate,
-        final_price: finalPrice
+        final_price: finalPrice,
+        attached_controllers: selectedControllers,
+        user_membership_type: formData.userMembershipType,
+        created_by: userId
       };
 
+      console.log('Creating session with data:', {
+        ...sessionData,
+        device_id: station.id,
+        base_price: basePrice,
+        final_price: finalPrice
+      });
+
+      // Get and validate controller IDs
       const controllerIds = selectedControllers.map(c => c.id);
-      const result = await sessionService.createSession(sessionData as any, controllerIds);
+      const validControllerIds = controllerIds.filter((id: number) => typeof id === 'number' && !isNaN(id));
+      
+      const result = await sessionService.createSession({
+        ...sessionData,
+        device_id: station.id 
+      }, validControllerIds);
 
       if (result.success && result.data) {
         const sessionResult = await sessionService.getActiveSession(station.id);
@@ -263,14 +368,16 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
               <label htmlFor="userId" className="block text-sm font-medium text-slate-400 mb-1">
                 User Name
               </label>
-              <input
-                type="text"
-                id="userId"
-                value={formData.userId}
-                onChange={(e) => setFormData({ ...formData, userId: e.target.value })}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500"
-                required
-              />
+                <input
+                  type="number"
+                  id="userId"
+                  value={formData.userId}
+                  onChange={(e) => setFormData({ ...formData, userId: e.target.value.replace(/\D/g, '') })}
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500"
+                  required
+                  min="1"
+                  placeholder="Enter numeric user ID"
+                />
             </div>
 
             <div>
@@ -296,14 +403,26 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
                 <select
                   id="game"
                   value={formData.gameId}
-                  onChange={(e) => setFormData({ ...formData, gameId: e.target.value })}
+                  onChange={(e) => {
+                    const selectedGame = games.find(g => g.id.toString() === e.target.value);
+                    if (!selectedGame?.is_active) {
+                      setError('Selected game is not active');
+                      return;
+                    }
+                    setFormData({ ...formData, gameId: e.target.value });
+                  }}
                   className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 appearance-none"
                   required
                 >
                   <option value="">Select a game</option>
-                  {games.map(game => (
-                    <option key={game.id} value={game.id}>
+                  {games.filter(g => g.is_active).map(game => (
+                    <option 
+                      key={game.id} 
+                      value={game.id}
+                      className={!game.is_active ? 'text-red-500 line-through' : ''}
+                    >
                       {game.name} (${game.price_per_minute.toFixed(2)}/min)
+                      {!game.is_active && ' (Inactive)'}
                     </option>
                   ))}
                 </select>

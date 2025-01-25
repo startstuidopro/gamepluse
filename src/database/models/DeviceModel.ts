@@ -21,10 +21,9 @@ export class DeviceModel extends BaseModel {
             const values = Object.values(device);
             const placeholders = values.map(() => '?').join(', ');
             
-            return this.withStatement<number>(
+            return this.withStatement(
                 `INSERT INTO devices (${columns}) VALUES (${placeholders})`,
                 async (stmt): Promise<QueryResult<number>> => {
-                    // Explicitly type the return value
                     try {
                         stmt.bind(values);
                         stmt.step();
@@ -61,9 +60,12 @@ export class DeviceModel extends BaseModel {
         return this.handleQuery(async () => {
             const result = await this.findById(id);
             if (!result.success || !result.data) {
-                throw new Error('Device not found');
+                return {
+                    success: false,
+                    error: 'Device not found',
+                    changes: 0
+                };
             }
-            // const current = result.data;
 
             const setClause = Object.keys(device)
                 .map(key => `${key} = ?`)
@@ -268,12 +270,16 @@ export class DeviceModel extends BaseModel {
                     try {
                         stmt.bind([id]);
                         if (stmt.step()) {
-                            const result = stmt.getAsObject() as Device & { 
-                                current_session?: any 
-                            };
+                            const result = stmt.getAsObject();
                             return { 
                                 success: true, 
-                                data: result,
+                                data: {
+                                    ...result,
+                                    id: result.id,
+                                    type: result.type as DeviceType,
+                                    status: result.status as DeviceStatus,
+                                    price_per_minute: Number(result.price_per_minute)
+                                },
                                 changes: 0
                             };
                         }
@@ -310,10 +316,10 @@ export class DeviceModel extends BaseModel {
                     SUM(CASE WHEN status = 'maintenance' THEN 1 ELSE 0 END) as maintenance
                 FROM devices`,
                 async (stmt): Promise<QueryResult<{
-                    total: string;
-                    available: string;
-                    occupied: string;
-                    maintenance: string;
+                    total: number;
+                    available: number;
+                    occupied: number;
+                    maintenance: number;
                 }>> => {
                     try {
                         if (stmt.step()) {
@@ -321,10 +327,10 @@ export class DeviceModel extends BaseModel {
                             return {
                                 success: true,
                                 data: {
-                                    total: result.total,
-                                    available: result.available,
-                                    occupied: result.occupied,
-                                    maintenance: result.maintenance
+                                    total: Number(result.total),
+                                    available: Number(result.available),
+                                    occupied: Number(result.occupied),
+                                    maintenance: Number(result.maintenance)
                                 },
                                 changes: 0
                             };
@@ -345,11 +351,15 @@ export class DeviceModel extends BaseModel {
                 FROM devices
                 GROUP BY type
                 ORDER BY type`,
-                async (stmt): Promise<QueryResult<Array<{type: string; count: string}>>> => {
+                async (stmt): Promise<QueryResult<Array<{type: DeviceType; count: number}>>> => {
                     try {
                         const results = [];
                         while (stmt.step()) {
-                            results.push(stmt.getAsObject());
+                            const row = stmt.getAsObject();
+                            results.push({
+                                type: row.type as DeviceType,
+                                count: Number(row.count)
+                            });
                         }
                         return { success: true, data: results, changes: 0 };
                     } catch (error) {
@@ -370,25 +380,14 @@ export class DeviceModel extends BaseModel {
                 };
             }
 
-            if (!counts.data || !byType.data) {
-                return {
-                    success: false,
-                    error: 'Missing status data after successful query',
-                    changes: 0
-                };
-            }
-
             return {
                 success: true,
                 data: {
-                    total: Number(counts.data.total),
-                    available: Number(counts.data.available),
-                    occupied: Number(counts.data.occupied),
-                    maintenance: Number(counts.data.maintenance),
-                    by_type: byType.data.map(row => ({
-                        type: row.type as DeviceType,
-                        count: Number(row.count)
-                    }))
+                    total: counts.data?.total || 0,
+                    available: counts.data?.available || 0,
+                    occupied: counts.data?.occupied || 0,
+                    maintenance: counts.data?.maintenance || 0,
+                    by_type: byType.data || []
                 },
                 changes: 0
             };

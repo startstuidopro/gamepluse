@@ -1,5 +1,5 @@
 import { BaseModel } from './BaseModel';
-import { Session, QueryResult, DeviceType, ControllerStatus } from '../../types';
+import { Session, QueryResult, DeviceType, ControllerStatus, Controller } from '../../types';
 
 interface SessionModelStatements {
     createStmt: any;
@@ -20,6 +20,7 @@ export class SessionModel extends BaseModel implements SessionModelStatements {
     getControllersStmt!: any;
     endSessionStmt!: any;
     getActiveSessionStmt!: any;
+ 
 
     private constructor() {
         super('sessions');
@@ -100,14 +101,25 @@ export class SessionModel extends BaseModel implements SessionModelStatements {
         }
     }
 
-    async create(session: Omit<Session, 'id' | 'end_time' | 'total_amount'>, controllerIds?: number[]): Promise<QueryResult<number>> {
-        return this.handleQuery<number>(async () => {
+    async create(session: Omit<Session, 'id' | 'end_time' | 'total_amount'> & { 
+        device_id: number;
+        
+        attached_controllers: Controller[];
+        user_membership_type: 'standard' | 'premium';
+        created_by: number;
+    }, controllerIds?: number[]): Promise<QueryResult<number>> {
+        return this.handleQuery<number>(async (db) => {
             return this.transaction(async () => {
                 // Create session
+                // Validate required fields
+                if (typeof session.device_id !== 'number' || isNaN(session.device_id)) {
+                    throw new Error('Device ID is required and must be a valid number');
+                }
+
                 const result = await this.createStmt.run(
-                    session.device_id,
+                    session.device_id, // Use validated device_id from session object
                     session.user_id,
-                    session.game_id,
+                    session.game_id || null, // Explicitly handle optional game_id
                     session.start_time,
                     session.base_price,
                     session.discount_rate,
@@ -125,20 +137,9 @@ export class SessionModel extends BaseModel implements SessionModelStatements {
 
                 return {
                     success: true,
-                    data: sessionId,
-                    lastInsertId: sessionId
+                    data: sessionId
                 };
             });
-        });
-    }
-
-    async endSession(id: number, endTime: string, totalAmount: number): Promise<QueryResult<void>> {
-        return this.handleQuery<void>(async () => {
-            const result = await this.endSessionStmt.run(endTime, totalAmount, id);
-            return {
-                success: result.changes > 0,
-                changes: result.changes
-            };
         });
     }
 
@@ -162,7 +163,7 @@ export class SessionModel extends BaseModel implements SessionModelStatements {
                 // Bind parameter and execute query
                 this.getActiveSessionStmt.bind([deviceId]);
                 const session = this.getActiveSessionStmt.getAsObject();
-                
+               
                 if (!session) {
                     return {
                         success: true,
@@ -206,7 +207,9 @@ export class SessionModel extends BaseModel implements SessionModelStatements {
                         identifier: c.identifier || '',
                         last_maintenance: c.last_maintenance || ''
                     })),
+                   
                     user_membership_type: session.user_membership_type as 'standard' | 'premium' | undefined,
+                    created_by: Number(session.created_by),
                     game: session.game_name ? {
                         id: Number(session.game_id),
                         name: String(session.game_name),
@@ -248,7 +251,7 @@ export class SessionModel extends BaseModel implements SessionModelStatements {
                 ...s,
                 price_per_minute: Number(s.price_per_minute || 0)
             }));
-            
+            console.log('session.user_membership_type:', stmt);
             return {
                 success: true,
                 data: results
@@ -273,7 +276,7 @@ export class SessionModel extends BaseModel implements SessionModelStatements {
             const sessions = await stmt.all(userId);
             const results = sessions.map((s: Session) => ({
                 ...s,
-                price_per_minute: Number(s.price_per_minute || 0)
+                
             }));
             
             return {

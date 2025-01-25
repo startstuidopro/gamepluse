@@ -14,16 +14,18 @@ export interface Session {
   device_id: number;
   user_id: number;
   game_id?: number;
+  game?: Game;
   start_time: string;
   end_time?: string;
   base_price: number;
   discount_rate: number;
   final_price: number;
-  total_amount?: number;
-  price_per_minute: number;
-  attached_controllers?: Controller[];
-  user_membership_type?: 'standard' | 'premium';
-  game?: Game;
+  total_amount?: number;  
+  attached_controllers: Controller[];
+  user_membership_type: 'standard' | 'premium';
+  created_by: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Controller {
@@ -44,6 +46,7 @@ export interface Game {
   image: string;
   device_types: DeviceType[];
   is_multiplayer: boolean;
+  is_active: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -94,23 +97,7 @@ export interface GameDeviceCompatibility {
     device_type: DeviceType;
 }
 
-export interface Session {
-    id: number;
-    device_id: number;
-    user_id: number;
-    game_id?: number;
-    start_time: string;
-    end_time?: string;
-    base_price: number;
-    discount_rate: number;
-    final_price: number;
-    total_amount?: number;
-    created_at?: string;
-    user_name?: string;
-    device_name?: string;
-    device_type?: string;
-    game_name?: string;
-}
+
 
 export interface SessionController {
     session_id: number;
