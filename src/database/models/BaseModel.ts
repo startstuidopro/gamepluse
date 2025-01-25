@@ -17,16 +17,11 @@ export class BaseModel {
         return this.db;
     }
 
-    protected async handleQuery<T>(callback: (db: Database) => Promise<T>): Promise<QueryResult<T>> {
+    protected async handleQuery<T>(callback: (db: Database) => Promise<QueryResult<T>>): Promise<QueryResult<T>> {
         try {
             const db = await this.getDb();
             const result = await callback(db);
-            return {
-                success: true,
-                data: result,
-                changes: (result as any)?.changes,
-                lastInsertId: (result as any)?.lastInsertRowid
-            };
+            return result;
         } catch (error) {
             console.error(`Database error:`, error);
             return {
@@ -62,13 +57,13 @@ export class BaseModel {
     }
 
     public async cleanup() {
-        for (const [sql, cached] of this.statementCache) {
+        for (const [_, cached] of this.statementCache) {
             cached.stmt.free();
         }
         this.statementCache.clear();
     }
 
-    protected async withStatement<T>(sql: string, callback: (stmt: any) => Promise<T>): Promise<T> {
+    protected async withStatement<T>(sql: string, callback: (stmt: any) => Promise<QueryResult<T>>): Promise<QueryResult<T>> {
         const stmt = await this.prepareStatement(sql);
         try {
             return await callback(stmt);
@@ -77,7 +72,7 @@ export class BaseModel {
         }
     }
 
-    protected async transaction<T>(callback: (db: Database) => Promise<T>): Promise<T> {
+    protected async transaction<T>(callback: (db: Database) => Promise<QueryResult<T>>): Promise<QueryResult<T>> {
         const db = await this.getDb();
         try {
             await db.exec('BEGIN TRANSACTION');
@@ -99,7 +94,10 @@ export class BaseModel {
                     while (stmt.step()) {
                         results.push(stmt.getAsObject());
                     }
-                    return results;
+                    return {
+                        success: true,
+                        data: results
+                    };
                 }
             );
         });
@@ -111,7 +109,10 @@ export class BaseModel {
                 `SELECT * FROM ${this.tableName} WHERE id = ?`,
                 async (stmt) => {
                     stmt.bind([id]);
-                    return stmt.step() ? stmt.getAsObject() : null;
+                    return {
+                        success: true,
+                        data: stmt.step() ? stmt.getAsObject() : null
+                    };
                 }
             );
         });
@@ -124,8 +125,7 @@ export class BaseModel {
             const placeholders = values.map(() => '?').join(', ');
             
             const sql = `INSERT INTO ${this.tableName} (${columns}) VALUES (${placeholders})`;
-            console.log('Executing SQL:', sql);
-            console.log('With values:', values);
+         
             
             return this.withStatement(
                 sql,
@@ -179,7 +179,10 @@ export class BaseModel {
                 async (stmt) => {
                     stmt.bind([id]);
                     stmt.step();
-                    return true;
+                        return {
+                            success: true,
+                            data: true
+                        };
                 }
             );
         });

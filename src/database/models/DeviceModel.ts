@@ -16,40 +16,45 @@ export class DeviceModel extends BaseModel {
     }
 
     async create(device: Omit<Device, 'id' | 'created_at' | 'updated_at'>): Promise<QueryResult<number>> {
-        try {
+        return this.handleQuery(async () => {
             const columns = Object.keys(device).join(', ');
             const values = Object.values(device);
             const placeholders = values.map(() => '?').join(', ');
             
-            const lastInsertId = await this.withStatement(
+            return this.withStatement<number>(
                 `INSERT INTO devices (${columns}) VALUES (${placeholders})`,
-                async (stmt) => {
-                    stmt.bind(values);
-                    stmt.step();
-                    const db = await this.getDb();
-                    const lastIdResult = db.exec('SELECT last_insert_rowid()');
-                    if (lastIdResult.length > 0 && lastIdResult[0].values.length > 0) {
-                        return Number(lastIdResult[0].values[0][0]);
+                async (stmt): Promise<QueryResult<number>> => {
+                    // Explicitly type the return value
+                    try {
+                        stmt.bind(values);
+                        stmt.step();
+                        const db = await this.getDb();
+                        const lastIdResult = db.exec('SELECT last_insert_rowid()');
+                        
+                        if (lastIdResult.length > 0 && lastIdResult[0].values.length > 0) {
+                            const lastInsertId = Number(lastIdResult[0].values[0][0]);
+                            return { 
+                                success: true, 
+                                data: lastInsertId,
+                                changes: 1,
+                                lastInsertId 
+                            };
+                        }
+                        return { 
+                            success: false, 
+                            error: 'Failed to get last insert ID',
+                            changes: 0 
+                        };
+                    } catch (error) {
+                        return {
+                            success: false,
+                            error: error instanceof Error ? error.message : 'Insert failed',
+                            changes: 0
+                        };
                     }
-                    throw new Error('Failed to get last insert ID');
                 }
             );
-            
-            return {
-                success: true,
-                data: lastInsertId,
-                changes: 1,
-                lastInsertId: lastInsertId,
-                error: undefined
-            };
-        } catch (error) {
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : 'Unknown error',
-                changes: 0,
-                lastInsertId: undefined
-            };
-        }
+        });
     }
 
     async update(id: number, device: Partial<Device>): Promise<QueryResult<void>> {
@@ -67,10 +72,18 @@ export class DeviceModel extends BaseModel {
             
             return this.withStatement(
                 `UPDATE devices SET ${setClause} WHERE id = ?`,
-                async (stmt) => {
-                    stmt.bind([...values, id]);
-                    stmt.step();
-                    return;
+                async (stmt): Promise<QueryResult<void>> => {
+                    try {
+                        stmt.bind([...values, id]);
+                        stmt.step();
+                        return { success: true, changes: 1 };
+                    } catch (error) {
+                        return {
+                            success: false,
+                            error: error instanceof Error ? error.message : 'Update failed',
+                            changes: 0
+                        };
+                    }
                 }
             );
         });
@@ -80,66 +93,93 @@ export class DeviceModel extends BaseModel {
         return this.handleQuery(async () => {
             return this.withStatement(
                 `UPDATE devices SET status = ? WHERE id = ?`,
-                async (stmt) => {
-                    stmt.bind([status, id]);
-                    stmt.step();
-                    return;
+                async (stmt): Promise<QueryResult<void>> => {
+                    try {
+                        stmt.bind([status, id]);
+                        stmt.step();
+                        return { success: true, changes: 1 };
+                    } catch (error) {
+                        return {
+                            success: false,
+                            error: error instanceof Error ? error.message : 'Status update failed',
+                            changes: 0
+                        };
+                    }
                 }
             );
         });
     }
 
-    async findById(id: number): Promise<QueryResult<Device | null>> {
-        try {
-            const device = await this.withStatement(
+    async findById(id: number): Promise<QueryResult<Device>> {
+        return this.handleQuery(async () => {
+            return this.withStatement(
                 `SELECT * FROM devices WHERE id = ?`,
-                async (stmt) => {
-                    stmt.bind([id]);
-                    if (stmt.step()) {
-                        const result = stmt.getAsObject();
+                async (stmt): Promise<QueryResult<Device>> => {
+                    try {
+                        stmt.bind([id]);
+                        if (stmt.step()) {
+                            const result = stmt.getAsObject();
+                            return {
+                                success: true,
+                                data: {
+                                    id: result.id,
+                                    name: result.name,
+                                    type: result.type as DeviceType,
+                                    status: result.status as DeviceStatus,
+                                    location: result.location,
+                                    price_per_minute: Number(result.price_per_minute),
+                                    created_at: result.created_at,
+                                    updated_at: result.updated_at
+                                },
+                                changes: 0
+                            };
+                        }
+                        return { 
+                            success: false, 
+                            error: 'Device not found',
+                            changes: 0 
+                        };
+                    } catch (error) {
                         return {
-                            id: result.id,
-                            name: result.name,
-                            type: result.type,
-                            status: result.status,
-                            location: result.location,
-                            price_per_minute: result.price_per_minute,
-                            created_at: result.created_at,
-                            updated_at: result.updated_at
-                        } as Device;
+                            success: false,
+                            error: error instanceof Error ? error.message : 'Lookup failed',
+                            changes: 0
+                        };
                     }
-                    return null;
                 }
             );
-            
-            return {
-                success: !!device,
-                data: device,
-                changes: 0,
-                lastInsertId: undefined,
-                error: device ? undefined : 'Device not found'
-            };
-        } catch (error) {
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : 'Unknown error',
-                changes: 0,
-                lastInsertId: undefined
-            };
-        }
+        });
     }
 
     async findByType(type: DeviceType): Promise<QueryResult<Device[]>> {
         return this.handleQuery(async () => {
             return this.withStatement(
                 `SELECT * FROM devices WHERE type = ?`,
-                async (stmt) => {
-                    stmt.bind([type]);
-                    const results = [];
-                    while (stmt.step()) {
-                        results.push(stmt.getAsObject());
+                async (stmt): Promise<QueryResult<Device[]>> => {
+                    try {
+                        stmt.bind([type]);
+                        const results: Device[] = [];
+                        while (stmt.step()) {
+                            const row = stmt.getAsObject();
+                            results.push({
+                                id: row.id,
+                                name: row.name,
+                                type: row.type as DeviceType,
+                                status: row.status as DeviceStatus,
+                                location: row.location,
+                                price_per_minute: Number(row.price_per_minute),
+                                created_at: row.created_at,
+                                updated_at: row.updated_at
+                            });
+                        }
+                        return { success: true, data: results, changes: 0 };
+                    } catch (error) {
+                        return {
+                            success: false,
+                            error: error instanceof Error ? error.message : 'Query failed',
+                            changes: 0
+                        };
                     }
-                    return results;
                 }
             );
         });
@@ -149,12 +189,30 @@ export class DeviceModel extends BaseModel {
         return this.handleQuery(async () => {
             return this.withStatement(
                 `SELECT * FROM devices WHERE status = 'available' ORDER BY type, name`,
-                async (stmt) => {
-                    const results = [];
-                    while (stmt.step()) {
-                        results.push(stmt.getAsObject());
+                async (stmt): Promise<QueryResult<Device[]>> => {
+                    try {
+                        const results: Device[] = [];
+                        while (stmt.step()) {
+                            const row = stmt.getAsObject();
+                            results.push({
+                                id: row.id,
+                                name: row.name,
+                                type: row.type as DeviceType,
+                                status: row.status as DeviceStatus,
+                                location: row.location,
+                                price_per_minute: Number(row.price_per_minute),
+                                created_at: row.created_at,
+                                updated_at: row.updated_at
+                            });
+                        }
+                        return { success: true, data: results, changes: 0 };
+                    } catch (error) {
+                        return {
+                            success: false,
+                            error: error instanceof Error ? error.message : 'Query failed',
+                            changes: 0
+                        };
                     }
-                    return results;
                 }
             );
         });
@@ -164,13 +222,31 @@ export class DeviceModel extends BaseModel {
         return this.handleQuery(async () => {
             return this.withStatement(
                 `SELECT * FROM devices WHERE type = ? AND status = 'available' ORDER BY name`,
-                async (stmt) => {
-                    stmt.bind([type]);
-                    const results = [];
-                    while (stmt.step()) {
-                        results.push(stmt.getAsObject());
+                async (stmt): Promise<QueryResult<Device[]>> => {
+                    try {
+                        stmt.bind([type]);
+                        const results: Device[] = [];
+                        while (stmt.step()) {
+                            const row = stmt.getAsObject();
+                            results.push({
+                                id: row.id,
+                                name: row.name,
+                                type: row.type as DeviceType,
+                                status: row.status as DeviceStatus,
+                                location: row.location,
+                                price_per_minute: Number(row.price_per_minute),
+                                created_at: row.created_at,
+                                updated_at: row.updated_at
+                            });
+                        }
+                        return { success: true, data: results, changes: 0 };
+                    } catch (error) {
+                        return {
+                            success: false,
+                            error: error instanceof Error ? error.message : 'Query failed',
+                            changes: 0
+                        };
                     }
-                    return results;
                 }
             );
         });
@@ -188,9 +264,31 @@ export class DeviceModel extends BaseModel {
                 LEFT JOIN sessions s ON d.id = s.device_id AND s.end_time IS NULL
                 LEFT JOIN users u ON s.user_id = u.id
                 WHERE d.id = ?`,
-                async (stmt) => {
-                    stmt.bind([id]);
-                    return stmt.step() ? stmt.getAsObject() : null;
+                async (stmt): Promise<QueryResult<Device & { current_session?: any }>> => {
+                    try {
+                        stmt.bind([id]);
+                        if (stmt.step()) {
+                            const result = stmt.getAsObject() as Device & { 
+                                current_session?: any 
+                            };
+                            return { 
+                                success: true, 
+                                data: result,
+                                changes: 0
+                            };
+                        }
+                        return { 
+                            success: false, 
+                            error: 'Device not found',
+                            changes: 0 
+                        };
+                    } catch (error) {
+                        return {
+                            success: false,
+                            error: error instanceof Error ? error.message : 'Query failed',
+                            changes: 0
+                        };
+                    }
                 }
             );
         });
@@ -211,8 +309,34 @@ export class DeviceModel extends BaseModel {
                     SUM(CASE WHEN status = 'occupied' THEN 1 ELSE 0 END) as occupied,
                     SUM(CASE WHEN status = 'maintenance' THEN 1 ELSE 0 END) as maintenance
                 FROM devices`,
-                async (stmt) => {
-                    return stmt.step() ? stmt.getAsObject() : null;
+                async (stmt): Promise<QueryResult<{
+                    total: string;
+                    available: string;
+                    occupied: string;
+                    maintenance: string;
+                }>> => {
+                    try {
+                        if (stmt.step()) {
+                            const result = stmt.getAsObject();
+                            return {
+                                success: true,
+                                data: {
+                                    total: result.total,
+                                    available: result.available,
+                                    occupied: result.occupied,
+                                    maintenance: result.maintenance
+                                },
+                                changes: 0
+                            };
+                        }
+                        return { success: false, error: 'No status data found', changes: 0 };
+                    } catch (error) {
+                        return {
+                            success: false,
+                            error: error instanceof Error ? error.message : 'Status query failed',
+                            changes: 0
+                        };
+                    }
                 }
             );
 
@@ -221,21 +345,52 @@ export class DeviceModel extends BaseModel {
                 FROM devices
                 GROUP BY type
                 ORDER BY type`,
-                async (stmt) => {
-                    const results = [];
-                    while (stmt.step()) {
-                        results.push(stmt.getAsObject());
+                async (stmt): Promise<QueryResult<Array<{type: string; count: string}>>> => {
+                    try {
+                        const results = [];
+                        while (stmt.step()) {
+                            results.push(stmt.getAsObject());
+                        }
+                        return { success: true, data: results, changes: 0 };
+                    } catch (error) {
+                        return {
+                            success: false,
+                            error: error instanceof Error ? error.message : 'Type count query failed',
+                            changes: 0
+                        };
                     }
-                    return results;
                 }
             );
 
+            if (!counts.success || !byType.success) {
+                return {
+                    success: false,
+                    error: counts.error || byType.error || 'Failed to get device status',
+                    changes: 0
+                };
+            }
+
+            if (!counts.data || !byType.data) {
+                return {
+                    success: false,
+                    error: 'Missing status data after successful query',
+                    changes: 0
+                };
+            }
+
             return {
-                total: counts?.total || 0,
-                available: counts?.available || 0,
-                occupied: counts?.occupied || 0,
-                maintenance: counts?.maintenance || 0,
-                by_type: byType || []
+                success: true,
+                data: {
+                    total: Number(counts.data.total),
+                    available: Number(counts.data.available),
+                    occupied: Number(counts.data.occupied),
+                    maintenance: Number(counts.data.maintenance),
+                    by_type: byType.data.map(row => ({
+                        type: row.type as DeviceType,
+                        count: Number(row.count)
+                    }))
+                },
+                changes: 0
             };
         });
     }

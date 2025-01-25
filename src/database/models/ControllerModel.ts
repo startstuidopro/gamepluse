@@ -18,8 +18,8 @@ export class ControllerModel extends BaseModel {
     // Prepared statements
     private async createStmt() {
         return this.prepareStatement(`
-            INSERT INTO controllers (name, type, status, price_per_minute, color)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO controllers (name, type, status, price_per_minute, color, identifier, last_maintenance)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         `);
     }
 
@@ -27,7 +27,7 @@ export class ControllerModel extends BaseModel {
         return this.prepareStatement(`
             UPDATE controllers 
             SET name = ?, type = ?, status = ?, price_per_minute = ?, color = ?
-            WHERE id = ?
+            WHERE id = ?, identifier = ?, last_maintenance = ?
         `);
     }
 
@@ -47,26 +47,21 @@ export class ControllerModel extends BaseModel {
 
     async create(controller: Omit<Controller, 'id' | 'created_at' | 'updated_at'>): Promise<QueryResult<{ id: number }>> {
         return this.handleQuery(async () => {
-            // Validate device exists
-            const deviceStmt = await this.prepareStatement(
-                'SELECT 1 FROM devices WHERE id = ?'
-            );
-             const deviceExists = await deviceStmt.get(controller.device_id);
-            await this.freeStatement(deviceStmt);
-
-            if (!deviceExists) {
-                throw new Error('Device not found');
-            }
-
             const stmt = await this.createStmt();
             try {
                 const result = await stmt.run(
-                    controller.device_id,
+                    controller.name,
+                    controller.type,
                     controller.identifier,
                     controller.status,
                     controller.last_maintenance ?? new Date().toISOString()
                 );
-                return { id: Number(result.lastInsertRowid) };
+                return { 
+                    success: true,
+                    data: { id: Number(result.lastInsertRowid) },
+                    changes: 1,
+                    lastInsertId: Number(result.lastInsertRowid)
+                };
             } finally {
                 await this.freeStatement(stmt);
             }
@@ -83,29 +78,18 @@ export class ControllerModel extends BaseModel {
                 throw new Error('Controller not found');
             }
 
-            // Validate device if changing
-            if (controller.device_id && controller.device_id !== current.device_id) {
-                const deviceStmt = await this.prepareStatement(
-                    'SELECT 1 FROM devices WHERE id = ?'
-                );
-                const deviceExists = await deviceStmt.get(controller.device_id);
-                await this.freeStatement(deviceStmt);
-
-                if (!deviceExists) {
-                    throw new Error('Device not found');
-                }
-            }
-
             const updateStmt = await this.updateStmt();
             try {
                 await updateStmt.run(
-                    controller.device_id ?? current.device_id,
+                    controller.name ?? current.name,
+                    controller.type ?? current.type,
+                    controller.status ?? current.status,
                     controller.identifier ?? current.identifier,
                     controller.status ?? current.status,
                     controller.last_maintenance ?? current.last_maintenance,
                     id
                 );
-                return undefined;
+                return { success: true, changes: 1 };
             } finally {
                 await this.freeStatement(updateStmt);
             }
@@ -135,7 +119,7 @@ export class ControllerModel extends BaseModel {
                     await this.freeStatement(maintenanceStmt);
                 }
 
-                return undefined;
+                return { success: true, changes: 1 };
             } finally {
                 await this.freeStatement(updateStmt);
             }
@@ -150,21 +134,11 @@ export class ControllerModel extends BaseModel {
                 if (!result) {
                     throw new Error('Controller not found');
                 }
-                return result as Controller;
-            } finally {
-                await this.freeStatement(stmt);
-            }
-        });
-    }
-
-    async findByDevice(deviceId: number): Promise<QueryResult<Controller[]>> {
-        return this.handleQuery(async () => {
-            const stmt = await this.prepareStatement(`
-                SELECT * FROM controllers WHERE device_id = ?
-            `);
-            try {
-                const results = await stmt.all(deviceId);
-                return results as Controller[];
+                return { 
+                    success: true, 
+                    data: result as Controller,
+                    changes: 0 
+                };
             } finally {
                 await this.freeStatement(stmt);
             }
@@ -173,19 +147,22 @@ export class ControllerModel extends BaseModel {
 
     async findAvailable(): Promise<QueryResult<Controller[]>> {
         return this.handleQuery(async () => {
-            const stmt = await this.prepareStatement(`
-                SELECT c.*, d.name as device_name, d.type as device_type
+            return this.withStatement(`
+                SELECT c.*
                 FROM controllers c
-                LEFT JOIN devices d ON c.device_id = d.id
                 WHERE c.status = 'available'
-                ORDER BY c.device_id, c.identifier
-            `);
-            try {
-                const results = await stmt.all();
-                return results as Controller[];
-            } finally {
-                await this.freeStatement(stmt);
-            }
+                ORDER BY c.identifier
+            `, async (stmt) => {
+                const results = [];
+                while (stmt.step()) {
+                    results.push(stmt.getAsObject());
+                }
+                return { 
+                    success: true, 
+                    data: results as Controller[],
+                    changes: 0 
+                };
+            });
         });
     }
 
@@ -196,15 +173,18 @@ export class ControllerModel extends BaseModel {
 
             const stmt = await this.prepareStatement(`
                 SELECT c.*, d.name as device_name, d.type as device_type
-                FROM controllers c
-                LEFT JOIN devices d ON c.device_id = d.id
-                WHERE c.last_maintenance < ?
+                FROM controllers
+                WHERE last_maintenance < ?
                    OR c.status = 'maintenance'
                 ORDER BY c.last_maintenance ASC
             `);
             try {
                 const results = await stmt.all(threshold.toISOString());
-                return results as Controller[];
+                return { 
+                    success: true, 
+                    data: results as Controller[],
+                    changes: 0 
+                };
             } finally {
                 await this.freeStatement(stmt);
             }
@@ -216,7 +196,7 @@ export class ControllerModel extends BaseModel {
         sessionId: number
     ): Promise<QueryResult<void>> {
         return this.handleQuery(async () => {
-            return this.transaction(async () => {
+            return this.transaction(async (db) => {
                 const findStmt = await this.findByIdStmt();
                 const controller = await findStmt.get(controllerId);
                 await this.freeStatement(findStmt);
@@ -253,7 +233,7 @@ export class ControllerModel extends BaseModel {
                 await updateStmt.run('in_use', controllerId);
                 await this.freeStatement(updateStmt);
 
-                return undefined;
+                return { success: true, changes: 1 };
             });
         });
     }
@@ -263,7 +243,7 @@ export class ControllerModel extends BaseModel {
         sessionId: number
     ): Promise<QueryResult<void>> {
         return this.handleQuery(async () => {
-            return this.transaction(async () => {
+            return this.transaction(async (db) => {
                 // Remove assignment
                 const deleteStmt = await this.prepareStatement(`
                     DELETE FROM session_controllers 
@@ -277,7 +257,7 @@ export class ControllerModel extends BaseModel {
                 await updateStmt.run('available', controllerId);
                 await this.freeStatement(updateStmt);
 
-                return undefined;
+                return { success: true, changes: 1 };
             });
         });
     }
@@ -303,7 +283,7 @@ export class ControllerModel extends BaseModel {
                     SUM(CASE WHEN status = 'in_use' THEN 1 ELSE 0 END) as in_use,
                     SUM(CASE WHEN status = 'maintenance' THEN 1 ELSE 0 END) as maintenance
                 FROM controllers
-            `);
+            `); 
             const counts = await countsStmt.get();
             await this.freeStatement(countsStmt);
 
@@ -311,12 +291,10 @@ export class ControllerModel extends BaseModel {
                 SELECT 
                     d.id as device_id,
                     d.name as device_name,
-                    COUNT(*) as total,
-                    SUM(CASE WHEN c.status = 'available' THEN 1 ELSE 0 END) as available
+                    COUNT(*) as total
                 FROM controllers c
-                JOIN devices d ON c.device_id = d.id
                 GROUP BY d.id
-                ORDER BY d.name
+                ORDER BY c.identifier
             `);
             const byDevice = await byDeviceStmt.all();
             await this.freeStatement(byDeviceStmt);
@@ -349,10 +327,18 @@ export class ControllerModel extends BaseModel {
                 await this.freeStatement(findStmt);
 
                 if (!controller) {
-                    return false;
+                    return { 
+                        success: false,
+                        changes: 0,
+                        data: false 
+                    };
                 }
                 if (controller.status === 'in_use') {
-                    return false;
+                    return { 
+                        success: false,
+                        changes: 0,
+                        data: false 
+                    };
                 }
 
                 // Remove any session assignments
@@ -369,7 +355,11 @@ export class ControllerModel extends BaseModel {
                 const result = await deleteStmt.run(id);
                 await this.freeStatement(deleteStmt);
 
-                return result.changes > 0;
+                return { 
+                    success: result.changes > 0,
+                    changes: result.changes,
+                    data: result.changes > 0 
+                };
             });
         });
     }

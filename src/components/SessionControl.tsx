@@ -53,7 +53,7 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
           identifier: '',
           last_maintenance: ''
         }));
-        console.log('Available controllers:', data);
+      
         setAvailableControllers(data);
       } else {
         setAvailableControllers([]);
@@ -65,13 +65,17 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
 
   const checkExistingSession = async () => {
     try {
-      console.log('Checking existing session for station:', station);
-      console.log('Station ID:', station.id);
+      // Validate device ID before making the call
+      if (typeof station.id !== 'number' || isNaN(station.id)) {
+        console.error('Invalid device ID:', station.id);
+        return;
+      }
+
       const result = await sessionService.getActiveSession(station.id);
-      console.log('Session service result:', result);
+     
       if (result.success && result.data) {
         const session = Array.isArray(result.data) ? result.data[0] : result.data;
-        console.log('Found active session:', session);
+     
         onUpdateSession(station.id, session);
       } else {
         console.log('No active session found');

@@ -5,18 +5,19 @@ import { gameService } from '../../services/gameService';
 
 export default function GameManager() {
   const [games, setGames] = useState<Game[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const [showForm, setShowForm] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
-  const [formData, setFormData] = useState<Game>({
+  const [_, setError] = useState<string | null>(null);
+  const [formData, setFormData] = useState<Omit<Game, 'id'> & { 
+    id: number; 
+    device_types: [DeviceType]
+  }>({
     id: 0,
     name: '',
     price_per_minute: 0.5,
     image: '',
-    compatible_devices: [],
-    is_multiplayer: false
+    device_types: ['PS5'], // Default to PS5 as tuple
+    is_multiplayer: false 
   });
 
   useEffect(() => {
@@ -24,36 +25,28 @@ export default function GameManager() {
   }, []);
 
   const loadGames = async () => {
-    setLoading(true);
-    setError(null);
     const result = await gameService.getGames();
     if (result.success && result.data) {
       const games = Array.isArray(result.data) ? result.data : [result.data];
       setGames(games as Game[]);
-    } else {
-      setError(result.error || 'Failed to load games');
     }
-    setLoading(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
 
-    // Validate price_per_minute
-    if (isNaN(formData.price_per_minute) || formData.price_per_minute < 0) {
-      setError('Price per minute must be a valid positive number');
+    if (isNaN(formData.price_per_minute) || formData.price_per_minute <= 0 || !formData.device_types.length) {
       return;
     }
 
     const gameData = {
       name: formData.name,
-      price_per_minute: Number(formData.price_per_minute.toFixed(2)), // Ensure 2 decimal places
+      price_per_minute: Number(formData.price_per_minute.toFixed(2)),
       image: formData.image,
       is_multiplayer: formData.is_multiplayer,
-      compatible_devices: formData.compatible_devices
+      device_types: formData.device_types
     };
-console.log(gameData);
+
     if (editingGame) {
       const result = await gameService.updateGame(editingGame.id, gameData);
       if (result.success) {
@@ -64,7 +57,7 @@ console.log(gameData);
         return;
       }
     } else {
-      const result = await gameService.createGame(gameData, formData.compatible_devices || []);
+      const result = await gameService.createGame(gameData, formData.device_types);
       if (result.success) {
         await loadGames();
       } else {
@@ -79,8 +72,8 @@ console.log(gameData);
       name: '',
       price_per_minute: 0.5,
       image: '',
-      compatible_devices: [],
-      is_multiplayer: false
+      device_types: ['PS5'], // Reset to default as tuple
+      is_multiplayer: false 
     });
   };
 
@@ -91,7 +84,7 @@ console.log(gameData);
       name: game.name,
       price_per_minute: game.price_per_minute,
       image: game.image,
-      compatible_devices: game.compatible_devices,
+      device_types: game.device_types.length ? [game.device_types[0]] : ['PS5'],
       is_multiplayer: game.is_multiplayer
     });
     setShowForm(true);
@@ -99,23 +92,11 @@ console.log(gameData);
 
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this game?')) {
-      setError(null);
       const result = await gameService.deleteGame(id);
       if (result.success) {
         await loadGames();
-      } else {
-        setError(result.error || 'Failed to delete game');
       }
     }
-  };
-
-  const handleDeviceTypeToggle = (type: DeviceType) => {
-    setFormData(prev => ({
-      ...prev,
-      compatible_devices: prev.compatible_devices?.includes(type)
-        ? prev.compatible_devices.filter(t => t !== type)
-        : [...(prev.compatible_devices || []), type]
-    }));
   };
 
   return (
@@ -131,8 +112,8 @@ console.log(gameData);
               name: '',
               price_per_minute: 0.5,
               image: '',
-              compatible_devices: [],
-              is_multiplayer: false
+              device_types: ['PS5'], // Reset to default as tuple
+              is_multiplayer: false 
             });
           }}
           className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition"
@@ -182,7 +163,7 @@ console.log(gameData);
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-400 mb-1">
-                  Image URL
+                  Image
                 </label>
                 <input
                   type="url"
@@ -194,24 +175,23 @@ console.log(gameData);
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-slate-400 mb-2">
-                  Compatible Devices
+                  Device Type
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {['PS5', 'PS4', 'Xbox Series X', 'Xbox One', 'Nintendo Switch'].map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => handleDeviceTypeToggle(type as DeviceType)}
-                      className={`px-3 py-1 rounded-full text-sm transition ${
-                        formData.compatible_devices?.includes(type as DeviceType)
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-                      }`}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                </div>
+                <select
+                  value={formData.device_types[0] || ''} // Use first element for single selection
+                  onChange={e => setFormData({ 
+                    ...formData, 
+                    device_types: e.target.value ? [e.target.value as DeviceType] : ['PS5'] // Ensure tuple format
+                  })}
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500"
+                >
+                  <option value="">Select device</option>
+                  <option value="PS5">PS5</option>
+                  <option value="PS4">PS4</option>
+                  <option value="Xbox Series X">Xbox Series X</option>
+                  <option value="Xbox One">Xbox One</option>
+                  <option value="Nintendo Switch">Nintendo Switch</option>
+                </select>
               </div>
               <div className="md:col-span-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-slate-400">
@@ -247,7 +227,7 @@ console.log(gameData);
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         {games.map(game => (
           <div
             key={game.id}
@@ -271,16 +251,11 @@ console.log(gameData);
                     <p className="text-sm text-slate-400">
                       Price: ${(game.price_per_minute || 0).toFixed(2)}/min
                     </p>
-                    <div className="flex flex-wrap gap-1">
-                      {game.compatible_devices?.map(type => (
-                        <span
-                          key={type}
-                          className="text-xs bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded-full"
-                        >
-                          {type}
-                        </span>
-                      ))}
-                    </div>
+                    {game.device_types?.[0] && (
+                      <span className="text-xs bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded-full">
+                        {game.device_types}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

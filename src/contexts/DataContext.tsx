@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Product, Device, Controller, Game, Station, Session } from '../types';
+import { User, Product, Device, Controller, Game, Station, Session, DeviceType } from '../types';
 import { getDatabase, waitForInit } from '../database';
 
 interface StationStats {
@@ -102,8 +102,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       await waitForInit();
       const db = await getDatabase();
 
-     
-      
       const [
         usersResult,
         productsResult,
@@ -164,7 +162,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         price_per_minute: row[4],
         color: row[5],
         created_at: row[6],
-        updated_at: row[7]
+        updated_at: row[7],
+        identifier: `CTRL-${row[0]}`,
+        last_maintenance: new Date().toISOString()
       })) as Controller[];
 
       const gamesData = gamesResult[0]?.values.map(row => ({
@@ -175,13 +175,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         is_multiplayer: Boolean(row[5]),
         created_at: row[6],
         updated_at: row[7],
-        device_type: row[4] 
+        device_types: [row[4]] as DeviceType[]
       })) as Game[];
 
       setUsers(usersData);
       setProducts(productsData);
       setDevices(devicesData);
       setControllers(controllersData);
+      setStations(devicesData)
       setGames(gamesData);
 
       setError(null);

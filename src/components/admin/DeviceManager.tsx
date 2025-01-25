@@ -14,7 +14,7 @@ export default function DeviceManager() {
   useEffect(() => {
     const fetchDevices = async () => {
       try {
-        const result = await deviceModel.findAvailable();
+        const result = await deviceModel.findAvailable();    
         if (result.success && result.data) {
           setDevices(result.data);
         } else {

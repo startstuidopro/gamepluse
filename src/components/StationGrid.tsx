@@ -1,6 +1,6 @@
 import  { useState, useEffect } from 'react';
 import { PlaySquare } from 'lucide-react';
-import { Session, Game } from '../types';
+import { Session, Game, DeviceType } from '../types';
 import type { Station } from '../types';
 import { gameService } from '../services/gameService';
 import SessionControl from './SessionControl';
@@ -26,7 +26,7 @@ export default function StationGrid() {
               'id' in g && 'name' in g &&
               'price_per_minute' in g
             );
-            console.log('Fetched games:', validGames);
+         
             setGames(validGames);
           } else {
             console.warn('No valid games data received');
@@ -135,8 +135,8 @@ export default function StationGrid() {
           onUpdateSession={handleSessionUpdate}
           games={games.filter(game => {
             try {
-              const devices = JSON.parse(game.device_types || '[]');
-              return devices.includes(selectedStation.type);
+              const devices: DeviceType[] = game.device_types || [];
+              return devices.includes(selectedStation.type as DeviceType);
             } catch {
               return false;
             }

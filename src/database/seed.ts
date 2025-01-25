@@ -47,6 +47,8 @@ export async function seedDatabase(db: Database) {
       status TEXT CHECK(status IN ('available', 'in-use', 'maintenance')) NOT NULL,
       price_per_minute REAL NOT NULL,
       color TEXT,
+      identifier TEXT NOT NULL,
+      last_maintenance TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
@@ -100,9 +102,17 @@ export async function seedDatabase(db: Database) {
       // Insert controllers
       for (const controller of seedData.controllers) {
         db.run(`
-          INSERT INTO controllers (name, type, status, price_per_minute, color)
-          VALUES (?, ?, ?, ?, ?)
-        `, [controller.name, controller.type, controller.status, controller.price_per_minute, controller.color || null]);
+          INSERT INTO controllers (name, type, status, price_per_minute, color, identifier, last_maintenance)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `, [
+          controller.name, 
+          controller.type, 
+          controller.status, 
+          controller.price_per_minute, 
+          controller.color || null,
+          controller.identifier || 'CTRL-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+          controller.last_maintenance || null
+        ]);
       }
 
       // Insert games

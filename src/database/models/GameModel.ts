@@ -61,165 +61,148 @@ export class GameModel extends BaseModel {
         GROUP BY g.id
     `);
 
-    private async initializeStatements() {
-        this.createStmt = this.prepareStatement(`
-            INSERT INTO games (name, price_per_minute, image, is_multiplayer)
-            VALUES (?, ?, ?, ?)
-        `);
-
-        this.addCompatibilityStmt = this.prepareStatement(`
-            INSERT INTO game_device_compatibility (game_id, device_type)
-            VALUES (?, ?)
-        `);
-
-        this.removeCompatibilityStmt = this.prepareStatement(`
-            DELETE FROM game_device_compatibility
-            WHERE game_id = ? AND device_type = ?
-        `);
-
-        this.clearCompatibilityStmt = this.prepareStatement(`
-            DELETE FROM game_device_compatibility WHERE game_id = ?
-        `);
-
-        this.getCompatibilityStmt = this.prepareStatement(`
-            SELECT device_type FROM game_device_compatibility WHERE game_id = ?
-        `);
-
-        this.findByIdStmt = this.prepareStatement(`
-            SELECT g.*,
-                   GROUP_CONCAT(gdc.device_type) as compatible_devices
-            FROM games g
-            LEFT JOIN game_device_compatibility gdc ON g.id = gdc.game_id
-            WHERE g.id = ?
-            GROUP BY g.id
-        `);
-    }
-
     async create(data: Record<string, any>): Promise<QueryResult<any>> {
-        // Map incoming data to database fields with explicit null checks
-      
-        const game = {
-            name: data.name?.trim() || '',
-            price_per_minute: Number(data.price_per_minute) || 0,
-            image: data.image || '',
-            is_multiplayer: Boolean(data.is_multiplayer),
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-        } satisfies Omit<Game, 'id'>;
-
-        // Double-check required fields
-        if (!game.name) {
-            return {
-                success: false,
-                error: 'Game name cannot be empty'
+        try {
+            const game = {
+                name: data.name?.trim() || '',
+                price_per_minute: Number(data.price_per_minute) || 0,
+                image: data.image || '',
+                is_multiplayer: Boolean(data.is_multiplayer),
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
             };
-        }
-        
-        const compatibleDevices = data.compatibleDevices ? data.compatibleDevices as DeviceType[] : [];
-        
-        console.log('Creating game with data:', game);
-        
-        // Validate required fields
-        if (!game.name?.trim()) {
-            const error = 'Game name is required and cannot be empty';
-            console.error('Validation error:', error);
-            return {
-                success: false,
-                error
-            };
-        }
-        
-        if (!game.price_per_minute || isNaN(game.price_per_minute)) {
-            const error = 'Price per minute must be a valid number';
-            console.error('Validation error:', error);
-            return {
-                success: false,
-                error
-            };
-        }
-        
-        console.log('Validation passed, proceeding with database insert');
-        return this.handleQuery(async () => {
-            return this.transaction(async () => {
-                const createStmt = await this.createStmt;
-                createStmt.reset();
-                console.log('Binding game data:', game);
-                createStmt.bind([
-                    game.name,
-                    game.price_per_minute,
-                    game.image,
-                    game.is_multiplayer,
-                    game.created_at,
-                    game.updated_at
-                ]);
-                const result = await createStmt.run();
 
-                const gameId = result.lastInsertRowid;
+            // Validation
+            if (!game.name) {
+                return {
+                    success: false,
+                    error: 'Game name cannot be empty'
+                };
+            }
 
-                // Add device compatibility
-                const addStmt = await this.addCompatibilityStmt;
-                for (const deviceType of compatibleDevices) {
-                    await addStmt.run(gameId, deviceType);
-                }
+            if (isNaN(game.price_per_minute) || game.price_per_minute < 0) {
+                return {
+                    success: false,
+                    error: 'Price per minute must be a valid positive number'
+                };
+            }
 
-                return gameId;
+            const compatibleDevices = data.device_types || [];
+
+            const result = await this.handleQuery(async () => {
+                return this.transaction(async () => {
+                    const createStmt = await this.createStmt;
+                    createStmt.reset();
+                    createStmt.bind([
+                        game.name,
+                        game.price_per_minute,
+                        game.image,
+                        game.is_multiplayer,
+                        game.created_at,
+                        game.updated_at
+                    ]);
+                    const result = await createStmt.run();
+
+                    const gameId = result.lastInsertRowid;
+
+                    // Add device compatibility
+                    const addStmt = await this.addCompatibilityStmt;
+                    for (const deviceType of compatibleDevices) {
+                        await addStmt.run(gameId, deviceType);
+                    }
+
+                    return gameId;
+                });
             });
-        });
+
+            return {
+                success: true,
+                data: result.data,
+                lastInsertId: result.data
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
     }
 
     async update(id: number, game: Partial<Game>, compatibleDevices?: DeviceType[]): Promise<QueryResult<void>> {
-        return this.handleQuery(async () => {
-            return this.transaction(async () => {
-                if (Object.keys(game).length > 0) {
-                    const findStmt = await this.prepareStatement('SELECT * FROM games WHERE id = ?');
-                    const current = await findStmt.get(id) as Game;
-                    if (!current) throw new Error('Game not found');
+        try {
+            await this.handleQuery(async () => {
+                return this.transaction(async () => {
+                    if (Object.keys(game).length > 0) {
+                        const findStmt = await this.prepareStatement('SELECT * FROM games WHERE id = ?');
+                        const current = await findStmt.get(id) as Game;
+                        if (!current) throw new Error('Game not found');
 
-                    const updateStmt = await this.prepareStatement(`
-                        UPDATE games
-                        SET name = ?, price_per_minute = ?, image = ?, is_multiplayer = ?
-                        WHERE id = ?
-                    `);
-                    await updateStmt.run(
-                        game.name ?? current.name,
-                        game.price_per_minute ?? current.price_per_minute,
-                        game.image ?? current.image,
-                        game.is_multiplayer ?? current.is_multiplayer,
-                        id
-                    );
-                }
-
-                // Update device compatibility if provided
-                if (compatibleDevices) {
-                    const clearStmt = await this.clearCompatibilityStmt;
-                    await clearStmt.run(id);
-                    
-                    const addStmt = await this.addCompatibilityStmt;
-                    for (const deviceType of compatibleDevices) {
-                        await addStmt.run(id, deviceType);
+                        const updateStmt = await this.prepareStatement(`
+                            UPDATE games
+                            SET name = ?, price_per_minute = ?, image = ?, is_multiplayer = ?
+                            WHERE id = ?
+                        `);
+                        await updateStmt.run(
+                            game.name ?? current.name,
+                            game.price_per_minute ?? current.price_per_minute,
+                            game.image ?? current.image,
+                            game.is_multiplayer ?? current.is_multiplayer,
+                            id
+                        );
                     }
-                }
+
+                    // Update device compatibility if provided
+                    if (compatibleDevices) {
+                        const clearStmt = await this.clearCompatibilityStmt;
+                        await clearStmt.run(id);
+                        
+                        const addStmt = await this.addCompatibilityStmt;
+                        for (const deviceType of compatibleDevices) {
+                            await addStmt.run(id, deviceType);
+                        }
+                    }
+                });
             });
-        });
+
+            return {
+                success: true
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
     }
 
     async findById(id: number): Promise<QueryResult<Game & { compatible_devices: DeviceType[] }>> {
-        return this.handleQuery(async () => {
+        try {
             const findStmt = await this.findByIdStmt;
             const game = await findStmt.get(id) as (Game & { compatible_devices: string | null }) | undefined;
             if (game) {
                 return {
-                    ...game,
-                    compatible_devices: game.compatible_devices ?
-                        game.compatible_devices.split(',') as DeviceType[] : []
+                    success: true,
+                    data: {
+                        ...game,
+                        compatible_devices: game.compatible_devices ?
+                            game.compatible_devices.split(',') as DeviceType[] : []
+                    }
                 };
             }
-            return null;
-        });
+            return {
+                success: false,
+                error: 'Game not found'
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
     }
 
     async findByDeviceType(deviceType: DeviceType): Promise<QueryResult<Game[]>> {
-        return this.handleQuery(async () => {
+        try {
             const stmt = await this.prepareStatement(`
                 SELECT DISTINCT g.*
                 FROM games g
@@ -227,12 +210,24 @@ export class GameModel extends BaseModel {
                 WHERE gdc.device_type = ?
                 ORDER BY g.name
             `);
-            return await stmt.all(deviceType);
-        });
+            const games = await stmt.all(deviceType);
+            return {
+                success: true,
+                data: games.map((game: Game & { compatible_devices?: string }) => ({
+                    ...game as Game,
+                    compatible_devices: game.compatible_devices?.split(',') || []
+                }))
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
     }
 
     async findMultiplayer(): Promise<QueryResult<Game[]>> {
-        return this.handleQuery(async () => {
+        try {
             const stmt = await this.prepareStatement(`
                 SELECT g.*, GROUP_CONCAT(gdc.device_type) as compatible_devices
                 FROM games g
@@ -241,8 +236,20 @@ export class GameModel extends BaseModel {
                 GROUP BY g.id
                 ORDER BY g.name
             `);
-            return await stmt.all();
-        });
+            const games = await stmt.all();
+            return {
+                success: true,
+                data: games.map((game: Game & { compatible_devices?: string }) => ({
+                    ...game as Game,
+                    compatible_devices: game.compatible_devices?.split(',') || []
+                }))
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
     }
 
     async getGameStats(): Promise<QueryResult<{
@@ -251,7 +258,7 @@ export class GameModel extends BaseModel {
         by_device: { device_type: DeviceType; count: number }[];
         most_played: { id: number; name: string; session_count: number }[];
     }>> {
-        return this.handleQuery(async () => {
+        try {
             const countsStmt = await this.prepareStatement(`
                 SELECT
                     COUNT(*) as total,
@@ -283,43 +290,79 @@ export class GameModel extends BaseModel {
             `);
             const mostPlayed = await mostPlayedStmt.all() as { id: number; name: string; session_count: number }[];
 
-            return counts ? {
-                ...counts,
-                by_device: byDevice,
-                most_played: mostPlayed
-            } : {
-                total: 0,
-                multiplayer: 0,
-                by_device: [],
-                most_played: []
+            return {
+                success: true,
+                data: counts ? {
+                    ...counts,
+                    by_device: byDevice,
+                    most_played: mostPlayed
+                } : {
+                    total: 0,
+                    multiplayer: 0,
+                    by_device: [],
+                    most_played: []
+                }
             };
-        });
+        } catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
     }
 
     async addDeviceCompatibility(gameId: number, deviceType: DeviceType): Promise<QueryResult<void>> {
-        return this.handleQuery(async () => {
+        try {
             const stmt = await this.addCompatibilityStmt;
             await stmt.run(gameId, deviceType);
-        });
+            return {
+                success: true
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
     }
 
     async removeDeviceCompatibility(gameId: number, deviceType: DeviceType): Promise<QueryResult<void>> {
-        return this.handleQuery(async () => {
+        try {
             const stmt = await this.removeCompatibilityStmt;
             await stmt.run(gameId, deviceType);
-        });
+            return {
+                success: true
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
     }
 
     async delete(id: number): Promise<QueryResult<boolean>> {
-        return this.handleQuery(async () => {
-            return this.transaction(async () => {
-                const clearStmt = await this.clearCompatibilityStmt;
-                await clearStmt.run(id);
-                
-                const deleteStmt = await this.prepareStatement('DELETE FROM games WHERE id = ?');
-                await deleteStmt.run(id);
-                return true;
+        try {
+            await this.handleQuery(async () => {
+                return this.transaction(async () => {
+                    const clearStmt = await this.clearCompatibilityStmt;
+                    await clearStmt.run(id);
+                    
+                    const deleteStmt = await this.prepareStatement('DELETE FROM games WHERE id = ?');
+                    await deleteStmt.run(id);
+                    return true;
+                });
             });
-        });
+
+            return {
+                success: true,
+                data: true
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
     }
 }

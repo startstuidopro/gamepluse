@@ -33,6 +33,8 @@ export interface Controller {
   status: 'available' | 'in_use' | 'maintenance';
   price_per_minute: number;
   color?: string;
+  identifier: string;
+  last_maintenance: string;
 }
 
 export interface Game {
@@ -40,7 +42,7 @@ export interface Game {
   name: string;
   price_per_minute: number;
   image: string;
-  device_types: [DeviceType];
+  device_types: DeviceType[];
   is_multiplayer: boolean;
   created_at?: string;
   updated_at?: string;
@@ -84,17 +86,7 @@ export interface Device {
 
 export type ControllerStatus = 'available' | 'in_use' | 'maintenance';
 
-export interface Controller {
-    id: number;
-    device_id: number;
-    identifier: string;
-    status: ControllerStatus;
-    last_maintenance: string;
-    created_at?: string;
-    updated_at?: string;
-    device_name?: string;
-    device_type?: string;
-}
+
 
 
 export interface GameDeviceCompatibility {

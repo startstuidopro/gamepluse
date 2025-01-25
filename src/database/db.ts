@@ -80,6 +80,8 @@ async function initializeDatabase() {
         status TEXT CHECK(status IN ('available', 'in-use', 'maintenance')) NOT NULL,
         price_per_minute DECIMAL(10, 2) NOT NULL,
         color TEXT,
+        identifier TEXT NOT NULL,
+        last_maintenance DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
@@ -99,6 +101,7 @@ async function initializeDatabase() {
         device_type TEXT CHECK(device_type IN ('PS5', 'PS4', 'Xbox Series X', 'Xbox One', 'Nintendo Switch')),
         FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
         PRIMARY KEY (game_id, device_type)
+ 
       );
 
       CREATE TABLE IF NOT EXISTS sessions (

@@ -81,13 +81,6 @@ export class ProductModel extends BaseModel {
             const current = await stmt.get([id]) as Product;
             if (!current) throw new Error('Product not found');
 
-            // Check barcode uniqueness if it's being updated
-            if (product.barcode && product.barcode !== current.barcode) {
-                const barcodeStmt = await this.prepareStatement(this.findByBarcodeStmtSql);
-                const existing = await barcodeStmt.get([product.barcode]) as Product;
-                if (existing) throw new Error('Product with this barcode already exists');
-            }
-
             const updateStmt = await this.prepareStatement(this.updateStmtSql);
             await updateStmt.run([
                 product.name ?? current.name,

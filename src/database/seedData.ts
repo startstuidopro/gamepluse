@@ -68,28 +68,36 @@ export const seedData = {
       type: 'PS5' as const,
       status: 'available' as const,
       price_per_minute: 0.1,
-      color: 'White'
+      color: 'White',
+      identifier: 'CTRL-PS5-WHITE-001',
+      last_maintenance: '2024-12-15'
     },
     {
       name: 'PS5 Controller Black',
       type: 'PS5' as const,
       status: 'available' as const,
       price_per_minute: 0.1,
-      color: 'Black'
+      color: 'Black',
+      identifier: 'CTRL-PS5-BLACK-001',
+      last_maintenance: '2024-12-10'
     },
     {
       name: 'PS4 Controller',
       type: 'PS4' as const,
       status: 'available' as const,
       price_per_minute: 0.08,
-      color: 'Black'
+      color: 'Black',
+      identifier: 'CTRL-PS4-BLACK-001',
+      last_maintenance: '2024-11-20'
     },
     {
       name: 'Xbox Controller',
       type: 'Xbox Series X' as const,
       status: 'available' as const,
       price_per_minute: 0.1,
-      color: 'Black'
+      color: 'Black',
+      identifier: 'CTRL-XBOX-BLACK-001',
+      last_maintenance: '2024-12-01'
     }
   ] as Omit<Controller, 'id'>[],
 
@@ -98,28 +106,28 @@ export const seedData = {
       name: 'God of War Ragnarök',
       price_per_minute: 0.5,
       image: 'https://images.unsplash.com/photo-1616249807402-9dae436108cf?w=150',
-      compatible_devices: ['PS5', 'PS4'],
+      device_types: ['PS5', 'PS4'],
       is_multiplayer: false
     },
     {
       name: 'Spider-Man 2',
       price_per_minute: 0.6,
       image: 'https://images.unsplash.com/photo-1608889825103-eb5ed706fc64?w=150',
-      compatible_devices: ['PS5'],
+      device_types: ['PS5'],
       is_multiplayer: false
     },
     {
       name: 'FIFA 24',
       price_per_minute: 0.4,
       image: 'https://images.unsplash.com/photo-1493711662062-fa541adb3fc8?w=150',
-      compatible_devices: ['PS5', 'PS4', 'Xbox Series X', 'Xbox One'],
+      device_types: ['PS5', 'PS4', 'Xbox Series X', 'Xbox One'],
       is_multiplayer: true
     },
     {
       name: 'Mario Kart 8 Deluxe',
       price_per_minute: 0.3,
       image: 'https://images.unsplash.com/photo-1612404819070-77c6da472e68?w=150',
-      compatible_devices: ['Nintendo Switch'],
+      device_types: ['Nintendo Switch'],
       is_multiplayer: true
     }
   ] as Omit<Game, 'id'>[]
