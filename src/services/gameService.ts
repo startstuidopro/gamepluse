@@ -10,12 +10,12 @@ export const gameService = {
         return GameModel.getInstance().findById(id);
     },
 
-    createGame: (game: Omit<Game, 'id' | 'created_at' | 'updated_at'>, compatibleDevices: DeviceType[]): QueryResult<number> => {
+    createGame: (game: Omit<Game, 'id' | 'created_at' | 'updated_at'>, device_types: DeviceType[]): QueryResult<number> => {
         return GameModel.getInstance().create(game);
     },
 
-    updateGame: (id: number, game: Partial<Game>, compatibleDevices?: DeviceType[]): QueryResult<void> => {
-        return GameModel.getInstance().update(id, game, compatibleDevices);
+    updateGame: (id: number, game: Partial<Game>, device_types?: DeviceType[]): QueryResult<void> => {
+        return GameModel.getInstance().update(id, game, device_types);
     },
 
     deleteGame: (id: number): QueryResult<void> => {

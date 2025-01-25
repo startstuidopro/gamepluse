@@ -1,43 +1,71 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Device, DeviceType } from '../../types';
 import { Plus, Monitor, Pencil, Trash2, DollarSign } from 'lucide-react';
+import { DeviceModel } from '../../database/models/DeviceModel';
+const deviceModel = DeviceModel.getInstance();
 
 export default function DeviceManager() {
-  const [devices, setDevices] = useState<Device[]>([
-    {
-      id: 1,
-      name: 'PS5-01',
-      type: 'PS5',
-      status: 'available',
-      location: 'Station 1',
-      pricePerMinute: 0.3
-    }
-  ]);
-
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingDevice, setEditingDevice] = useState<Device | null>(null);
+
+  useEffect(() => {
+    const fetchDevices = async () => {
+      try {
+        const result = await deviceModel.findAvailable();
+        if (result.success && result.data) {
+          setDevices(result.data);
+        } else {
+          setError(result.error || 'Failed to load devices');
+        }
+      } catch (err) {
+        setError('Failed to load devices');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDevices();
+  }, []);
+
   const [formData, setFormData] = useState({
     name: '',
     type: 'PS5' as DeviceType,
     location: '',
     status: 'available' as Device['status'],
-    pricePerMinute: 0.3
+    price_per_minute: 0.3
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingDevice) {
-      setDevices(devices.map(d =>
-        d.id === editingDevice.id
-          ? { ...formData, id: editingDevice.id }
-          : d
-      ));
-    } else {
-      setDevices([...devices, { ...formData, id: Date.now() }]);
+    try {
+      if (editingDevice) {
+        const result = await deviceModel.update(editingDevice.id, formData);
+        if (result.success) {
+          setDevices(devices.map(d =>
+            d.id === editingDevice.id
+              ? { ...d, ...formData }
+              : d
+          ));
+        } else {
+          setError(result.error || 'Failed to update device');
+        }
+      } else {
+        const result = await deviceModel.create(formData);
+        if (result.success && result.data) {
+          const newDevice = { ...formData, id: result.data };
+          setDevices([...devices, newDevice]);
+        } else {
+          setError(result.error || 'Failed to create device');
+        }
+      }
+      setShowForm(false);
+      setEditingDevice(null);
+      setFormData({ name: '', type: 'PS5', location: '', status: 'available', price_per_minute: 0.3 });
+    } catch (err) {
+      setError('Failed to save device');
     }
-    setShowForm(false);
-    setEditingDevice(null);
-    setFormData({ name: '', type: 'PS5', location: '', status: 'available', pricePerMinute: 0.3 });
   };
 
   const handleEdit = (device: Device) => {
@@ -47,26 +75,37 @@ export default function DeviceManager() {
       type: device.type,
       location: device.location,
       status: device.status,
-      pricePerMinute: device.pricePerMinute
+      price_per_minute: device.price_per_minute
     });
     setShowForm(true);
   };
 
-  const handleDelete = (deviceId: number) => {
-    if (confirm('Are you sure you want to delete this device?')) {
-      setDevices(devices.filter(d => d.id !== deviceId));
+  const handleDelete = async (deviceId: number) => {
+    try {
+      if (confirm('Are you sure you want to delete this device?')) {
+        const result = await deviceModel.updateStatus(deviceId, 'maintenance');
+        if (result.success) {
+          setDevices(devices.filter(d => d.id !== deviceId));
+        } else {
+          setError(result.error || 'Failed to delete device');
+        }
+      }
+    } catch (err) {
+      setError('Failed to delete device');
     }
   };
 
   return (
     <div className="space-y-6">
+      {loading && <div className="text-white">Loading devices...</div>}
+      {error && <div className="text-red-500">{error}</div>}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-white">Device Management</h2>
         <button
           onClick={() => {
             setShowForm(true);
             setEditingDevice(null);
-            setFormData({ name: '', type: 'PS5', location: '', status: 'available', pricePerMinute: 0.3 });
+            setFormData({ name: '', type: 'PS5', location: '', status: 'available', price_per_minute: 0.3 });
           }}
           className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition"
         >
@@ -143,8 +182,8 @@ export default function DeviceManager() {
                   type="number"
                   step="0.01"
                   min="0"
-                  value={formData.pricePerMinute}
-                  onChange={e => setFormData({ ...formData, pricePerMinute: parseFloat(e.target.value) })}
+                  value={formData.price_per_minute}
+                  onChange={e => setFormData({ ...formData, price_per_minute: parseFloat(e.target.value) })}
                   className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500"
                   required
                 />
@@ -172,7 +211,7 @@ export default function DeviceManager() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         {devices.map(device => (
           <div
             key={device.id}
@@ -191,7 +230,7 @@ export default function DeviceManager() {
                     <p className="text-sm text-slate-400">Status: {device.status}</p>
                     <p className="text-sm text-slate-400 flex items-center gap-1">
                       <DollarSign className="h-4 w-4" />
-                      ${device.pricePerMinute.toFixed(2)}/min
+                      ${device.price_per_minute.toFixed(2)}/min
                     </p>
                   </div>
                 </div>

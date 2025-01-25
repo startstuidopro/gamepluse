@@ -110,7 +110,7 @@ export async function seedDatabase(db: Database) {
         db.run(`
           INSERT INTO games (name, price_per_minute, image, device_types, is_multiplayer)
           VALUES (?, ?, ?, ?, ?)
-        `, [game.name, game.price_per_minute, game.image, JSON.stringify(game.compatible_devices), game.is_multiplayer ? 1 : 0]);
+        `, [game.name, game.price_per_minute, game.image, JSON.stringify(game.device_types), game.is_multiplayer ? 1 : 0]);
       }
     }
 

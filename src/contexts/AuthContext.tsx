@@ -35,12 +35,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: userData[0],
             name: userData[1],
             phone: userData[2],
-            role: userData[3],
-            membership_type: userData[4],
-            credit: userData[5],
-            last_active: userData[6],
-            created_at: userData[7],
-            updated_at: userData[8]
+            role: userData[4],
+            membership_type: userData[5],
+            credit: userData[6],
+            last_active: userData[7],
+            created_at: userData[8],
+            updated_at: userData[9]
           } as User;
           setUser(user);
         }

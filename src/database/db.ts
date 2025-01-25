@@ -38,6 +38,7 @@ async function initializeDatabase() {
         // If database file doesn't exist, create new one
         db = new SQL.Database();
          await initializeSeed(db);
+        console.warn('Database file not found, creating new database');
       }
     } catch (error) {
       // If any other error occurs, create new database
@@ -215,8 +216,8 @@ export async function waitForInit(): Promise<void> {
 }
 
 const DbConnection = () => {
-  const [db, setDb] = useState<Database | null>(null);
-  const [error, setError] = useState<string>("");
+  const [__, setDb] = useState<Database | null>(null);
+  const [_, setError] = useState<string>("");
 
   useEffect(() => {
     getDatabase()

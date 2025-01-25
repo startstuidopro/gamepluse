@@ -1,40 +1,40 @@
-import  { useState } from 'react';
+import  { useState, useEffect } from 'react';
 import ProductGrid from './ProductGrid';
 import Cart from './Cart';
 import { Product } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import InventoryManager from './InventoryManager';
+import type { QueryResult } from '../../types';
 import BarcodeScanner from './BarcodeScanner';
 import { Plus } from 'lucide-react';
+import { productService } from '../../services/productService';
 
 export default function Shop() {
   const { isAdmin } = useAuth();
   const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
   const [showInventory, setShowInventory] = useState(false);
-  
-  // Demo products with barcodes
-  const products: Product[] = [
-    { 
-      id: 1, 
-      name: 'Coca Cola', 
-      price: 2.50, 
-      cost: 1.20,
-      category: 'drinks', 
-      image: 'https://images.unsplash.com/photo-1629203851122-3726ecdf080e?w=150',
-      stock: 24,
-      barcode: 'PS-DRINK-001'
-    },
-    { 
-      id: 2, 
-      name: 'Doritos', 
-      price: 3.00, 
-      cost: 1.50,
-      category: 'snacks', 
-      image: 'https://images.unsplash.com/photo-1600952841320-db92ec4047ca?w=150',
-      stock: 15,
-      barcode: 'PS-SNACK-001'
-    }
-  ];
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+ 
+const [error, setError] = useState<string | null>(null);
+
+   useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const result = await productService.getProducts();
+        if (result.success && result.data) {
+          setProducts(result.data);
+        } else if (result.error) {
+          setError(result.error);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch products');
+      }
+      setLoading(false);
+    };
+
+    fetchProducts();
+  }, []) ;
 
   const addToCart = (product: Product) => {
     if (product.stock <= 0) {
@@ -77,6 +77,10 @@ export default function Shop() {
       alert('Product not found!');
     }
   };
+
+  if (loading) return <div>Loading products...</div>;
+  if (error) return <div>Error loading products: {error}</div>;
+  if (!products.length) return <div>No products available</div>;
 
   return (
     <div>

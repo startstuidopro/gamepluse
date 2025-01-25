@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import  { useState, useEffect } from 'react';
 import { User } from '../../types';
 import UserList from './UserList';
 import UserForm from './UserForm';
@@ -28,16 +28,17 @@ export default function UserManagement() {
       const results = await db.exec(`
         SELECT * FROM users ORDER BY name ASC
       `);
+     
       const usersData = results[0]?.values.map(row => ({
         id: row[0],
         name: row[1],
         phone: row[2],
-        role: row[3],
-        membership_type: row[4],
-        credit: row[5],
-        last_active: row[6],
-        created_at: row[7],
-        updated_at: row[8]
+        role: row[4],
+        membership_type: row[5],
+        credit: row[6],
+        last_active: row[7],
+        created_at: row[8],
+        updated_at: row[9]
       })) as User[];
       setUsers(usersData);
     } catch (err) {
@@ -92,7 +93,7 @@ export default function UserManagement() {
           setUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u));
         }
       } else {
-        const result = await db.run(`
+         await db.run(`
           INSERT INTO users (
             name, phone, password_hash, role, 
             membership_type, credit, last_active
@@ -149,8 +150,8 @@ export default function UserManagement() {
       console.error('Error deleting user:', err);
     }
   };
-
-  const staffUsers = users.filter(user => ['admin', 'accountant', 'staff'].includes(user.role));
+ 
+  const staffUsers = users.filter(user => ['admin', 'staff'].includes(user.role));
   const customerUsers = users.filter(user => user.role === 'customer');
 
   if (currentUser?.role !== 'admin') {

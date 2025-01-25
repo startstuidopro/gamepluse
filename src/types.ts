@@ -40,8 +40,7 @@ export interface Game {
   name: string;
   price_per_minute: number;
   image: string;
-  device_types: string;
-  compatible_devices?: DeviceType[];
+  device_types: [DeviceType];
   is_multiplayer: boolean;
   created_at?: string;
   updated_at?: string;
@@ -97,15 +96,6 @@ export interface Controller {
     device_type?: string;
 }
 
-export interface Game {
-    id: number;
-    name: string;
-    price_per_minute: number;
-    image: string;
-    is_multiplayer: boolean;
-    created_at?: string;
-    updated_at?: string;
-}
 
 export interface GameDeviceCompatibility {
     game_id: number;
@@ -187,13 +177,10 @@ export interface DBResult {
     lastInsertRowid: number;
 }
 
-export interface QueryResult<T> extends Promise<T> {
+export interface QueryResult<T> {
     success: boolean;
-    data?: T | T[];
+    data?: T;
     error?: string;
     changes?: number;
     lastInsertId?: number;
-    then: Promise<T>['then'];
-    catch: Promise<T>['catch'];
-    finally: Promise<T>['finally'];
 }

@@ -16,190 +16,273 @@ export class ControllerModel extends BaseModel {
     }
 
     // Prepared statements
-    private createStmt = this.prepareStatement(`
-        INSERT INTO controllers (device_id, identifier, status, last_maintenance)
-        VALUES (?, ?, ?, ?)
-    `);
+    private async createStmt() {
+        return this.prepareStatement(`
+            INSERT INTO controllers (name, type, status, price_per_minute, color)
+            VALUES (?, ?, ?, ?, ?)
+        `);
+    }
 
-    private updateStmt = this.prepareStatement(`
-        UPDATE controllers 
-        SET device_id = ?, identifier = ?, status = ?, last_maintenance = ?
-        WHERE id = ?
-    `);
+    private async updateStmt() {
+        return this.prepareStatement(`
+            UPDATE controllers 
+            SET name = ?, type = ?, status = ?, price_per_minute = ?, color = ?
+            WHERE id = ?
+        `);
+    }
 
-    private updateStatusStmt = this.prepareStatement(`
-        UPDATE controllers SET status = ? WHERE id = ?
-    `);
+    private async updateStatusStmt() {
+        return this.prepareStatement(`
+            UPDATE controllers SET status = ? WHERE id = ?
+        `);
+    }
 
-    private findByIdStmt = this.prepareStatement(`
-        SELECT c.*, d.name as device_name, d.type as device_type
-        FROM controllers c
-        LEFT JOIN devices d ON c.device_id = d.id
-        WHERE c.id = ?
-    `);
+    private async findByIdStmt() {
+        return this.prepareStatement(`
+            SELECT c.*
+            FROM controllers c
+            WHERE c.id = ?
+        `);
+    }
 
-    private findByDeviceStmt = this.prepareStatement(`
-        SELECT * FROM controllers WHERE device_id = ?
-    `);
-
-    create(controller: Omit<Controller, 'id' | 'created_at' | 'updated_at'>): QueryResult<number> {
-        return this.handleQuery(() => {
+    async create(controller: Omit<Controller, 'id' | 'created_at' | 'updated_at'>): Promise<QueryResult<{ id: number }>> {
+        return this.handleQuery(async () => {
             // Validate device exists
-            const deviceExists = this.prepareStatement(
+            const deviceStmt = await this.prepareStatement(
                 'SELECT 1 FROM devices WHERE id = ?'
-            ).get(controller.device_id);
+            );
+             const deviceExists = await deviceStmt.get(controller.device_id);
+            await this.freeStatement(deviceStmt);
 
             if (!deviceExists) {
                 throw new Error('Device not found');
             }
 
-            const result = this.createStmt.run(
-                controller.device_id,
-                controller.identifier,
-                controller.status,
-                controller.last_maintenance ?? new Date().toISOString()
-            );
-            return result.lastInsertRowid;
+            const stmt = await this.createStmt();
+            try {
+                const result = await stmt.run(
+                    controller.device_id,
+                    controller.identifier,
+                    controller.status,
+                    controller.last_maintenance ?? new Date().toISOString()
+                );
+                return { id: Number(result.lastInsertRowid) };
+            } finally {
+                await this.freeStatement(stmt);
+            }
         });
     }
 
-    update(id: number, controller: Partial<Controller>): QueryResult<void> {
-        return this.handleQuery(() => {
-            const current = this.findByIdStmt.get(id) as Controller;
-            if (!current) throw new Error('Controller not found');
+    async update(id: number, controller: Partial<Controller>): Promise<QueryResult<void>> {
+        return this.handleQuery(async () => {
+            const findStmt = await this.findByIdStmt();
+            const current = await findStmt.get(id);
+            await this.freeStatement(findStmt);
+
+            if (!current) {
+                throw new Error('Controller not found');
+            }
 
             // Validate device if changing
             if (controller.device_id && controller.device_id !== current.device_id) {
-                const deviceExists = this.prepareStatement(
+                const deviceStmt = await this.prepareStatement(
                     'SELECT 1 FROM devices WHERE id = ?'
-                ).get(controller.device_id);
+                );
+                const deviceExists = await deviceStmt.get(controller.device_id);
+                await this.freeStatement(deviceStmt);
 
                 if (!deviceExists) {
                     throw new Error('Device not found');
                 }
             }
 
-            this.updateStmt.run(
-                controller.device_id ?? current.device_id,
-                controller.identifier ?? current.identifier,
-                controller.status ?? current.status,
-                controller.last_maintenance ?? current.last_maintenance,
-                id
-            );
-        });
-    }
-
-    updateStatus(id: number, status: ControllerStatus): QueryResult<void> {
-        return this.handleQuery(() => {
-            const current = this.findByIdStmt.get(id) as Controller;
-            if (!current) throw new Error('Controller not found');
-
-            this.updateStatusStmt.run(status, id);
-
-            // If marking as maintenance, update last_maintenance
-            if (status === 'maintenance') {
-                this.prepareStatement(
-                    'UPDATE controllers SET last_maintenance = ? WHERE id = ?'
-                ).run(new Date().toISOString(), id);
+            const updateStmt = await this.updateStmt();
+            try {
+                await updateStmt.run(
+                    controller.device_id ?? current.device_id,
+                    controller.identifier ?? current.identifier,
+                    controller.status ?? current.status,
+                    controller.last_maintenance ?? current.last_maintenance,
+                    id
+                );
+                return undefined;
+            } finally {
+                await this.freeStatement(updateStmt);
             }
         });
     }
 
-    findById(id: number): QueryResult<Controller> {
-        return this.handleQuery(() => {
-            const result = this.findByIdStmt.get(id) as Controller;
-            if (!result) return null;
-            return result;
+    async updateStatus(id: number, status: ControllerStatus): Promise<QueryResult<void>> {
+        return this.handleQuery(async () => {
+            const findStmt = await this.findByIdStmt();
+            const current = await findStmt.get(id);
+            await this.freeStatement(findStmt);
+
+            if (!current) {
+                throw new Error('Controller not found');
+            }
+
+            const updateStmt = await this.updateStatusStmt();
+            try {
+                await updateStmt.run(status, id);
+
+                // If marking as maintenance, update last_maintenance
+                if (status === 'maintenance') {
+                    const maintenanceStmt = await this.prepareStatement(
+                        'UPDATE controllers SET last_maintenance = ? WHERE id = ?'
+                    );
+                    await maintenanceStmt.run(new Date().toISOString(), id);
+                    await this.freeStatement(maintenanceStmt);
+                }
+
+                return undefined;
+            } finally {
+                await this.freeStatement(updateStmt);
+            }
         });
     }
 
-    findByDevice(deviceId: number): QueryResult<Controller[]> {
-        return this.handleQuery(() => {
-            return this.findByDeviceStmt.all(deviceId);
+    async findById(id: number): Promise<QueryResult<Controller>> {
+        return this.handleQuery(async () => {
+            const stmt = await this.findByIdStmt();
+            try {
+                const result = await stmt.get(id);
+                if (!result) {
+                    throw new Error('Controller not found');
+                }
+                return result as Controller;
+            } finally {
+                await this.freeStatement(stmt);
+            }
         });
     }
 
-    findAvailable(): QueryResult<Controller[]> {
-        return this.handleQuery(() => {
-            return this.prepareStatement(`
+    async findByDevice(deviceId: number): Promise<QueryResult<Controller[]>> {
+        return this.handleQuery(async () => {
+            const stmt = await this.prepareStatement(`
+                SELECT * FROM controllers WHERE device_id = ?
+            `);
+            try {
+                const results = await stmt.all(deviceId);
+                return results as Controller[];
+            } finally {
+                await this.freeStatement(stmt);
+            }
+        });
+    }
+
+    async findAvailable(): Promise<QueryResult<Controller[]>> {
+        return this.handleQuery(async () => {
+            const stmt = await this.prepareStatement(`
                 SELECT c.*, d.name as device_name, d.type as device_type
                 FROM controllers c
                 LEFT JOIN devices d ON c.device_id = d.id
                 WHERE c.status = 'available'
                 ORDER BY c.device_id, c.identifier
-            `).all() as Controller[];
+            `);
+            try {
+                const results = await stmt.all();
+                return results as Controller[];
+            } finally {
+                await this.freeStatement(stmt);
+            }
         });
     }
 
-    findNeedingMaintenance(daysThreshold: number = 30): QueryResult<Controller[]> {
-        return this.handleQuery(() => {
+    async findNeedingMaintenance(daysThreshold: number = 30): Promise<QueryResult<Controller[]>> {
+        return this.handleQuery(async () => {
             const threshold = new Date();
             threshold.setDate(threshold.getDate() - daysThreshold);
 
-            return this.prepareStatement(`
+            const stmt = await this.prepareStatement(`
                 SELECT c.*, d.name as device_name, d.type as device_type
                 FROM controllers c
                 LEFT JOIN devices d ON c.device_id = d.id
                 WHERE c.last_maintenance < ?
                    OR c.status = 'maintenance'
                 ORDER BY c.last_maintenance ASC
-            `).all(threshold.toISOString()) as Controller[];
+            `);
+            try {
+                const results = await stmt.all(threshold.toISOString());
+                return results as Controller[];
+            } finally {
+                await this.freeStatement(stmt);
+            }
         });
     }
 
-    assignToSession(
+    async assignToSession(
         controllerId: number, 
         sessionId: number
-    ): QueryResult<void> {
-        return this.handleQuery(() => {
-            return this.transaction(() => {
-                const controller = this.findByIdStmt.get(controllerId) as Controller;
-                if (!controller) throw new Error('Controller not found');
+    ): Promise<QueryResult<void>> {
+        return this.handleQuery(async () => {
+            return this.transaction(async () => {
+                const findStmt = await this.findByIdStmt();
+                const controller = await findStmt.get(controllerId);
+                await this.freeStatement(findStmt);
+
+                if (!controller) {
+                    throw new Error('Controller not found');
+                }
                 if (controller.status !== 'available') {
                     throw new Error('Controller is not available');
                 }
 
                 // Validate session exists and is active
-                const sessionExists = this.prepareStatement(`
+                const sessionStmt = await this.prepareStatement(`
                     SELECT 1 FROM sessions 
                     WHERE id = ? AND end_time IS NULL
-                `).get(sessionId);
+                `);
+                const sessionExists = await sessionStmt.get(sessionId);
+                await this.freeStatement(sessionStmt);
 
                 if (!sessionExists) {
                     throw new Error('Active session not found');
                 }
 
                 // Create assignment
-                this.prepareStatement(`
+                const assignStmt = await this.prepareStatement(`
                     INSERT INTO session_controllers (session_id, controller_id)
                     VALUES (?, ?)
-                `).run(sessionId, controllerId);
+                `);
+                await assignStmt.run(sessionId, controllerId);
+                await this.freeStatement(assignStmt);
 
                 // Update controller status
-                this.updateStatusStmt.run('in_use', controllerId);
+                const updateStmt = await this.updateStatusStmt();
+                await updateStmt.run('in_use', controllerId);
+                await this.freeStatement(updateStmt);
+
+                return undefined;
             });
         });
     }
 
-    unassignFromSession(
+    async unassignFromSession(
         controllerId: number, 
         sessionId: number
-    ): QueryResult<void> {
-        return this.handleQuery(() => {
-            return this.transaction(() => {
+    ): Promise<QueryResult<void>> {
+        return this.handleQuery(async () => {
+            return this.transaction(async () => {
                 // Remove assignment
-                this.prepareStatement(`
+                const deleteStmt = await this.prepareStatement(`
                     DELETE FROM session_controllers 
                     WHERE session_id = ? AND controller_id = ?
-                `).run(sessionId, controllerId);
+                `);
+                await deleteStmt.run(sessionId, controllerId);
+                await this.freeStatement(deleteStmt);
 
                 // Update controller status
-                this.updateStatusStmt.run('available', controllerId);
+                const updateStmt = await this.updateStatusStmt();
+                await updateStmt.run('available', controllerId);
+                await this.freeStatement(updateStmt);
+
+                return undefined;
             });
         });
     }
 
-    getControllerStats(): QueryResult<{
+    async getControllerStats(): Promise<QueryResult<{
         total: number;
         available: number;
         in_use: number;
@@ -211,23 +294,20 @@ export class ControllerModel extends BaseModel {
             available: number 
         }[];
         maintenance_needed: number;
-    }> {
-        return this.handleQuery(() => {
-            const counts = this.prepareStatement(`
+    }>> {
+        return this.handleQuery(async () => {
+            const countsStmt = await this.prepareStatement(`
                 SELECT 
                     COUNT(*) as total,
                     SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) as available,
                     SUM(CASE WHEN status = 'in_use' THEN 1 ELSE 0 END) as in_use,
                     SUM(CASE WHEN status = 'maintenance' THEN 1 ELSE 0 END) as maintenance
                 FROM controllers
-            `).get() as {
-                total: number;
-                available: number;
-                in_use: number;
-                maintenance: number;
-            };
+            `);
+            const counts = await countsStmt.get();
+            await this.freeStatement(countsStmt);
 
-            const byDevice = this.prepareStatement(`
+            const byDeviceStmt = await this.prepareStatement(`
                 SELECT 
                     d.id as device_id,
                     d.name as device_name,
@@ -237,22 +317,21 @@ export class ControllerModel extends BaseModel {
                 JOIN devices d ON c.device_id = d.id
                 GROUP BY d.id
                 ORDER BY d.name
-            `).all() as {
-                device_id: number;
-                device_name: string;
-                total: number;
-                available: number;
-            }[];
+            `);
+            const byDevice = await byDeviceStmt.all();
+            await this.freeStatement(byDeviceStmt);
 
             const threshold = new Date();
             threshold.setDate(threshold.getDate() - 30);
             
-            const maintenanceNeeded = this.prepareStatement(`
+            const maintenanceStmt = await this.prepareStatement(`
                 SELECT COUNT(*) as count
                 FROM controllers
                 WHERE last_maintenance < ?
                    OR status = 'maintenance'
-            `).get(threshold.toISOString()) as { count: number };
+            `);
+            const maintenanceNeeded = await maintenanceStmt.get(threshold.toISOString());
+            await this.freeStatement(maintenanceStmt);
 
             return {
                 ...counts,
@@ -262,24 +341,35 @@ export class ControllerModel extends BaseModel {
         });
     }
 
-    delete(id: number): QueryResult<void> {
-        return this.handleQuery(() => {
-            return this.transaction(() => {
-                const controller = this.findByIdStmt.get(id) as Controller;
-                if (!controller) throw new Error('Controller not found');
+    async delete(id: number): Promise<QueryResult<boolean>> {
+        return this.handleQuery(async () => {
+            return this.transaction(async () => {
+                const findStmt = await this.findByIdStmt();
+                const controller = await findStmt.get(id);
+                await this.freeStatement(findStmt);
+
+                if (!controller) {
+                    return false;
+                }
                 if (controller.status === 'in_use') {
-                    throw new Error('Cannot delete controller in use');
+                    return false;
                 }
 
                 // Remove any session assignments
-                this.prepareStatement(
+                const deleteAssignmentsStmt = await this.prepareStatement(
                     'DELETE FROM session_controllers WHERE controller_id = ?'
-                ).run(id);
+                );
+                await deleteAssignmentsStmt.run(id);
+                await this.freeStatement(deleteAssignmentsStmt);
 
                 // Delete controller
-                this.prepareStatement(
+                const deleteStmt = await this.prepareStatement(
                     'DELETE FROM controllers WHERE id = ?'
-                ).run(id);
+                );
+                const result = await deleteStmt.run(id);
+                await this.freeStatement(deleteStmt);
+
+                return result.changes > 0;
             });
         });
     }

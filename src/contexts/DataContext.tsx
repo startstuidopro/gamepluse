@@ -172,10 +172,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         name: row[1],
         price_per_minute: row[2],
         image: row[3],
-        is_multiplayer: Boolean(row[4]),
-        created_at: row[5],
-        updated_at: row[6],
-        compatible_devices: row[4] ? JSON.parse(row[4] as string) : []
+        is_multiplayer: Boolean(row[5]),
+        created_at: row[6],
+        updated_at: row[7],
+        device_type: row[4] 
       })) as Game[];
 
       setUsers(usersData);

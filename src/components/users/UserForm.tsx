@@ -25,7 +25,7 @@ export default function UserForm({ user, onSave, onCancel, isStaffForm = false }
         name: user.name,
         phone: user.phone,
         password: '',
-        membershipType: user.membershipType,
+        membershipType: user.membership_type,
         role: user.role,
         credit: user.credit
       });
@@ -47,6 +47,7 @@ export default function UserForm({ user, onSave, onCancel, isStaffForm = false }
     // In a real app, hash the password before sending
     const userData = {
       ...formData,
+      membership_type: formData.membershipType,
       password_hash: formData.password // In production, hash this!
     };
     
@@ -125,8 +126,7 @@ export default function UserForm({ user, onSave, onCancel, isStaffForm = false }
               onChange={e => setFormData({ ...formData, role: e.target.value as UserRole })}
               className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500"
             >
-              <option value="admin">Admin</option>
-              <option value="accountant">Accountant</option>
+              <option value="admin">Admin</option>            
               <option value="staff">Staff</option>
             </select>
           </div>
