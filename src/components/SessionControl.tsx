@@ -18,7 +18,7 @@ interface SessionControlProps {
 export default function SessionControl({ station, onClose, onUpdateSession, games }: SessionControlProps) {
  
   const [formData, setFormData] = useState({
-    userId: '',
+    userName: '',
     gameId: '',
     userMembershipType: 'standard' as 'standard' | 'premium'
   });
@@ -48,8 +48,7 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
           type: String(row[2]) as DeviceType,
           status: (String(row[3]) === 'in-use' ? 'in_use' : String(row[3])) as 'available' | 'in_use' | 'maintenance',
           price_per_minute: Number(row[4]),
-          color: row[5] ? String(row[5]) : undefined,
-          device_id: 0,
+          color: row[5] ? String(row[5]) : undefined,          
           identifier: '',
           last_maintenance: ''
         }));
@@ -129,17 +128,26 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
       const discountRate = calculateDiscountRate();
       const finalPrice = basePrice * (1 - discountRate);
 
-      // Validate user ID format
-      if (!formData.userId || !/^[1-9]\d*$/.test(formData.userId)) {
-        throw new Error('Invalid User ID: Must be a positive numeric value');
-      }
-      const userId = parseInt(formData.userId);
+      let userId: number; // Declare in outer scope
       
-      // Validate user exists
+      // Validate and lookup user
+      if (!formData.userName.trim()) {
+        throw new Error('Username is required');
+      }
+      
       try {
-        const userCheck = await db.exec(`SELECT id, name FROM users WHERE id = ${userId}`);
+        // Lookup user by name
+        const userCheck = await db.exec(
+          `SELECT id, name FROM users WHERE name = '${formData.userName.replace(/'/g, "''")}'`
+        );
+        
         if (!userCheck?.[0]?.values?.length) {
-          throw new Error(`User ${userId} not found - please verify the ID`);
+          throw new Error(`User "${formData.userName}" not found`);
+        }
+        
+        userId = Number(userCheck[0].values[0][0]);
+        if (isNaN(userId)) {
+          throw new Error('Invalid user ID format from database');
         }
         const userName = userCheck[0].values[0][1];
         console.log(`Starting session for user: ${userName} (ID: ${userId})`);
@@ -186,21 +194,23 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
       }
 
       const sessionData: Omit<Session, 'id' | 'created_at' | 'updated_at'> = {
-        device_id: station.id,
+        device_id: station.device_id,
         user_id: userId,
+        user_name: formData.userName,
         game_id: gameId || undefined,
         start_time: new Date().toISOString(),
-        base_price: basePrice,
+        base_price: station.price_per_minute,
         discount_rate: discountRate,
         final_price: finalPrice,
         attached_controllers: selectedControllers,
         user_membership_type: formData.userMembershipType,
-        created_by: userId
+        created_by: userId,device_name:station.name,device_type:station.type,
+        
       };
 
       console.log('Creating session with data:', {
         ...sessionData,
-        device_id: station.id,
+        device_id: station.device_id,
         base_price: basePrice,
         final_price: finalPrice
       });
@@ -365,35 +375,21 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
             }
           }} className="space-y-4">
             <div>
-              <label htmlFor="userId" className="block text-sm font-medium text-slate-400 mb-1">
-                User Name
+              <label htmlFor="userName" className="block text-sm font-medium text-slate-400 mb-1">
+              User Name
               </label>
-                <input
-                  type="number"
-                  id="userId"
-                  value={formData.userId}
-                  onChange={(e) => setFormData({ ...formData, userId: e.target.value.replace(/\D/g, '') })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500"
-                  required
-                  min="1"
-                  placeholder="Enter numeric user ID"
-                />
-            </div>
-
-            <div>
-              <label htmlFor="membershipType" className="block text-sm font-medium text-slate-400 mb-1">
-                Membership Type
-              </label>
-              <select
-                id="membershipType"
-                value={formData.userMembershipType}
-                onChange={(e) => setFormData({ ...formData, userMembershipType: e.target.value as 'standard' | 'premium' })}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500"
-              >
-                <option value="standard">Standard</option>
-                <option value="premium">Premium (20% off)</option>
-              </select>
-            </div>
+              <input
+              type="text"
+              id="userName"
+              value={formData.userName}
+              onChange={(e) => {
+                const value = e.target.value.replace(/[^a-zA-Z0-9 ]/g, '');
+                setFormData({ ...formData, userName: value });
+              }}
+              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500"
+              placeholder="Enter user name"
+              />
+            </div>            
 
             <div>
               <label htmlFor="game" className="block text-sm font-medium text-slate-400 mb-1">
@@ -412,14 +408,12 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
                     setFormData({ ...formData, gameId: e.target.value });
                   }}
                   className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 appearance-none"
-                  required
                 >
                   <option value="">Select a game</option>
-                  {games.filter(g => g.is_active).map(game => (
+                  {games.filter(g => g.is_active || true).map(game => (
                     <option 
                       key={game.id} 
-                      value={game.id}
-                      className={!game.is_active ? 'text-red-500 line-through' : ''}
+                      value={game.id}                    
                     >
                       {game.name} (${game.price_per_minute.toFixed(2)}/min)
                       {!game.is_active && ' (Inactive)'}

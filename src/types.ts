@@ -1,38 +1,64 @@
+export type DeviceType =
+  'PS5' |
+  'PS4' |
+  'Xbox Series X' |
+  'Xbox One' |
+  'Nintendo Switch';
+
+export type UserRole = 'admin' | 'staff' | 'customer';
+export type MembershipType = 'standard' | 'premium';
+export type DeviceStatus = 'available' | 'occupied' | 'maintenance';
+export type ProductCategory = 'drinks' | 'snacks' | 'sweets';
+export type OrderStatus = 'pending' | 'completed' | 'cancelled';
+export type DiscountType = 'devices' | 'games' | 'controllers' | 'products';
+export type ControllerStatus = 'available' | 'in_use' | 'maintenance';
+
 export interface Station {
   id: number;
   name: string;
   type: DeviceType;
-  status: 'available' | 'occupied' | 'maintenance';
+  status: DeviceStatus;
   location: string;
   price_per_minute: number;
-  current_session?: Session;
-  last_session?: Session;
+  current_session_id?: number;
+  last_session_id?: number;
+  created_at?: string;
+  updated_at?: string;
 }
+
 
 export interface Session {
   id: number;
-  device_id: number;
-  user_id: number;
-  game_id?: number;
-  game?: Game;
+  station_id: number;
+  user: {
+    id: number;
+    name: string;
+    membership_type: MembershipType;
+  };
+  game?: {
+    id: number;
+    name: string;
+    price_per_minute: number;
+  };
+  created_by: {
+    id: number;
+    name: string;
+  };
   start_time: string;
   end_time?: string;
   base_price: number;
   discount_rate: number;
   final_price: number;
-  total_amount?: number;  
+  total_amount?: number;
   attached_controllers: Controller[];
-  user_membership_type: 'standard' | 'premium';
-  created_by: number;
   created_at?: string;
-  updated_at?: string;
 }
 
 export interface Controller {
   id: number;
   name: string;
   type: DeviceType;
-  status: 'available' | 'in_use' | 'maintenance';
+  status: ControllerStatus;
   price_per_minute: number;
   color?: string;
   identifier: string;
@@ -50,17 +76,6 @@ export interface Game {
   created_at?: string;
   updated_at?: string;
 }
-
-export type DeviceType =
-  'PS5' |
-  'PS4' |
-  'Xbox Series X' |
-  'Xbox One' |
-  'Nintendo Switch';
-
-export type UserRole = 'admin' | 'staff' | 'customer';
-export type MembershipType = 'standard' | 'premium';
-
 export interface User {
     id: number;
     name: string;
@@ -74,37 +89,16 @@ export interface User {
     updated_at?: string;
 }
 
-export type DeviceStatus = 'available' | 'occupied' | 'maintenance';
-
-export interface Device {
-    id: number;
-    name: string;
-    type: DeviceType;
-    status: DeviceStatus;
-    location: string;
-    price_per_minute: number;
-    created_at?: string;
-    updated_at?: string;
-}
-
-export type ControllerStatus = 'available' | 'in_use' | 'maintenance';
-
-
-
 
 export interface GameDeviceCompatibility {
     game_id: number;
     device_type: DeviceType;
 }
 
-
-
 export interface SessionController {
     session_id: number;
     controller_id: number;
 }
-
-export type ProductCategory = 'drinks' | 'snacks' | 'sweets';
 
 export interface Product {
     id: number;
@@ -118,8 +112,6 @@ export interface Product {
     created_at?: string;
     updated_at?: string;
 }
-
-export type OrderStatus = 'pending' | 'completed' | 'cancelled';
 
 export interface Order {
     id: number;
@@ -139,9 +131,6 @@ export interface OrderItem {
     total_price: number;
     product_name?: string;
 }
-
-export type DiscountType = 'devices' | 'games' | 'controllers' | 'products';
-
 export interface DiscountConfig {
     id: number;
     membership_type: MembershipType;

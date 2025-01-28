@@ -30,14 +30,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [devices, setDevices] = useState<Device[]>([]);
   const [controllers, setControllers] = useState<Controller[]>([]);
   const [games, setGames] = useState<Game[]>([]);
-  const [stations, setStations] = useState<(Station & { currentSession?: Session; lastSession?: Session })[]>([
-    { id: 1, name: 'PS5-01', status: 'available', type: 'PS5', location: 'Station 1', price_per_minute: 0.3 },
-    { id: 2, name: 'PS5-02', status: 'available', type: 'PS5', location: 'Station 2', price_per_minute: 0.3 },
-    { id: 3, name: 'PS5-03', status: 'maintenance', type: 'PS5', location: 'Station 3', price_per_minute: 0.3 },
-    { id: 4, name: 'PS4-01', status: 'available', type: 'PS4', location: 'Station 4', price_per_minute: 0.2 },
-    { id: 5, name: 'Xbox-01', status: 'available', type: 'Xbox Series X', location: 'Station 5', price_per_minute: 0.3 },
-    { id: 6, name: 'Switch-01', status: 'available', type: 'Nintendo Switch', location: 'Station 6', price_per_minute: 0.2 }
-  ]);
+  const [stations, setStations] = useState<(Station & { currentSession?: Session; lastSession?: Session })[]>([]);
   const [stationStats, setStationStats] = useState<StationStats>({
     totalRevenue: 0,
     totalSessions: 0,
@@ -50,7 +43,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     const start_time = new Date(session.start_time).getTime();
     const end_time = new Date(session.end_time || new Date()).getTime();
     const durationMinutes = (end_time - start_time) / (1000 * 60);
-    return durationMinutes * session.price_per_minute;
+    return durationMinutes * session.final_price;
   };
 
   const updateStationStats = (session: Session) => {
@@ -107,16 +100,29 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         productsResult,
         devicesResult,
         controllersResult,
-        gamesResult
+        gamesResult,
+        stationsResult
       ] = await Promise.all([
         db.exec(`SELECT * FROM users`),
         db.exec('SELECT * FROM products'),
         db.exec('SELECT * FROM devices'),
         db.exec('SELECT * FROM controllers'),
-        db.exec('SELECT * FROM games')
+        db.exec('SELECT * FROM games'),
+        db.exec('SELECT * FROM stations')
       ]);
 
       // Convert query results to typed objects
+      const stationsData = stationsResult[0]?.values.map((row: any[]) => ({
+        id: row[0],
+        name: row[1],
+        status: row[2],
+        device_id: row[3],
+        type: row[4],
+        price_per_minute: row[5],
+        created_at: row[6],
+        updated_at: row[7],
+        location: row[8]
+      })) as Station[];
       const usersData = usersResult[0]?.values.map(row => ({
         id: row[0],
         name: row[1],
@@ -177,12 +183,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         updated_at: row[7],
         device_types: [row[4]] as DeviceType[]
       })) as Game[];
-
+      console.log(gamesData);
       setUsers(usersData);
       setProducts(productsData);
       setDevices(devicesData);
       setControllers(controllersData);
-      setStations(devicesData)
+      setStations(stationsData)
       setGames(gamesData);
 
       setError(null);

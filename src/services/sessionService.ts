@@ -2,9 +2,14 @@ import { SessionModel } from '../database/models/SessionModel';
 import { Session, QueryResult } from '../types';
 
 export const sessionService = {
-    createSession: async (session: Omit<Session, 'id' | 'created_at' | 'updated_at'>, controllerIds: number[]): Promise<QueryResult<number>> => {
+    createSession: async (session: Omit<Session, 'id' | 'created_at' | 'updated_at'> & {
+        device_id: number; // Added required device_id
+    }, controllerIds: number[]): Promise<QueryResult<number>> => {
         const instance = await SessionModel.getInstance();
-        return instance.create(session, controllerIds);
+        return instance.create({
+            ...session,
+            device_id: session.device_id // Explicitly include device_id
+        }, controllerIds);
     },
 
     endSession: async (id: number): Promise<QueryResult<void>> => {

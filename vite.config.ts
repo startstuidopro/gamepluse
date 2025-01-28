@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: false,
     proxy: {
       '/api/tv': {
         target: 'http://localhost:3001',

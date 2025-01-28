@@ -107,14 +107,14 @@ export const seedData = {
       price_per_minute: 0.5,
       image: 'https://images.unsplash.com/photo-1616249807402-9dae436108cf?w=150',
       device_types: ['PS5', 'PS4'],
-      is_multiplayer: false
+      is_multiplayer: false,is_active: true
     },
     {
       name: 'Spider-Man 2',
       price_per_minute: 0.6,
       image: 'https://images.unsplash.com/photo-1608889825103-eb5ed706fc64?w=150',
       device_types: ['PS5'],
-      is_multiplayer: false
+      is_multiplayer: false,is_active: true
     },
     {
       name: 'FIFA 24',
@@ -128,7 +128,7 @@ export const seedData = {
       price_per_minute: 0.3,
       image: 'https://images.unsplash.com/photo-1612404819070-77c6da472e68?w=150',
       device_types: ['Nintendo Switch'],
-      is_multiplayer: true
+      is_multiplayer: true,is_active: true
     }
   ] as Omit<Game, 'id'>[]
 };

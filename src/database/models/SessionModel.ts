@@ -108,12 +108,15 @@ export class SessionModel extends BaseModel implements SessionModelStatements {
         user_membership_type: 'standard' | 'premium';
         created_by: number;
     }, controllerIds?: number[]): Promise<QueryResult<number>> {
-        return this.handleQuery<number>(async (db) => {
+        return this.handleQuery<number>(async () => {
             return this.transaction(async () => {
                 // Create session
                 // Validate required fields
+                if (session.device_id === null || session.device_id === undefined) {
+                    throw new Error('Device ID is required');
+                }
                 if (typeof session.device_id !== 'number' || isNaN(session.device_id)) {
-                    throw new Error('Device ID is required and must be a valid number');
+                    throw new Error('Device ID must be a valid number');
                 }
 
                 const result = await this.createStmt.run(
@@ -318,6 +321,16 @@ export class SessionModel extends BaseModel implements SessionModelStatements {
                     changes: result.changes
                 };
             });
+        });
+    }
+
+    async endSession(id: number, endTime: string, totalAmount: number): Promise<QueryResult<void>> {
+        return this.handleQuery<void>(async () => {
+            const result = await this.endSessionStmt.run(endTime, totalAmount, id);
+            return {
+                success: true,
+                changes: result.changes
+            };
         });
     }
 }

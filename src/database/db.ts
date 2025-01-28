@@ -147,6 +147,7 @@ async function initializeDatabase(): Promise<Database> {
         price_per_minute DECIMAL(10, 2) NOT NULL,
         image TEXT NOT NULL,
         is_multiplayer BOOLEAN NOT NULL,
+         is_active BOOLEAN NOT NULL DEFAULT 1,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
@@ -291,7 +292,7 @@ const DbConnection = () => {
       });
   }, []);
 
-  return null; // This component doesn't render anything
+  return null; 
 };
 
 export default DbConnection;

@@ -8,7 +8,7 @@ export async function seedDatabase(db: Database) {
         name TEXT NOT NULL,
         phone TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
-        role TEXT CHECK(role IN ('admin', 'accountant', 'staff', 'customer')) NOT NULL,
+        role TEXT CHECK(role IN ('admin', 'staff', 'customer')) NOT NULL,
         membership_type TEXT CHECK(membership_type IN ('standard', 'premium')) NOT NULL,
         credit DECIMAL(10, 2) DEFAULT 0.00,
         last_active DATETIME,
@@ -16,13 +16,15 @@ export async function seedDatabase(db: Database) {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
 
-      CREATE TABLE IF NOT EXISTS devices (
+      CREATE TABLE IF NOT EXISTS stations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         type TEXT CHECK(type IN ('PS5', 'PS4', 'Xbox Series X', 'Xbox One', 'Nintendo Switch')) NOT NULL,
         status TEXT CHECK(status IN ('available', 'occupied', 'maintenance')) NOT NULL,
         location TEXT NOT NULL,
         price_per_minute DECIMAL(10, 2) NOT NULL,
+        current_session_id INTEGER DEFAULT NULL,
+        last_session_id INTEGER DEFAULT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
@@ -47,6 +49,7 @@ export async function seedDatabase(db: Database) {
         device_types TEXT NOT NULL,
         image TEXT NOT NULL,
         is_multiplayer BOOLEAN NOT NULL,
+        is_active BOOLEAN NOT NULL DEFAULT 1,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
@@ -61,9 +64,10 @@ export async function seedDatabase(db: Database) {
 
       CREATE TABLE IF NOT EXISTS sessions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        device_id INTEGER NOT NULL,
-        user_id INTEGER NOT NULL,
-        game_id INTEGER,
+        station_id INTEGER NOT NULL,
+        user JSON NOT NULL,
+        game JSON,
+        created_by JSON NOT NULL,
         start_time DATETIME NOT NULL,
         end_time DATETIME,
         base_price DECIMAL(10, 2) NOT NULL,
@@ -71,9 +75,7 @@ export async function seedDatabase(db: Database) {
         final_price DECIMAL(10, 2) NOT NULL,
         total_amount DECIMAL(10, 2),
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (device_id) REFERENCES devices(id),
-        FOREIGN KEY (user_id) REFERENCES users(id),
-        FOREIGN KEY (game_id) REFERENCES games(id)
+        FOREIGN KEY (station_id) REFERENCES stations(id) ON DELETE CASCADE
       );
 
       CREATE TABLE IF NOT EXISTS session_controllers (
@@ -156,13 +158,19 @@ export async function seedDatabase(db: Database) {
         `, [product.name, product.price, product.cost, product.category, product.image, product.stock, product.barcode]);
       }
 
-      // Insert devices
-      for (const device of seedData.devices) {
+      // Insert stations directly
+      seedData.devices.forEach((device, index) => {
         db.run(`
-          INSERT INTO devices (name, type, status, location, price_per_minute)
+          INSERT INTO stations (name, type, status, location, price_per_minute)
           VALUES (?, ?, ?, ?, ?)
-        `, [device.name, device.type, device.status, device.location, device.price_per_minute]);
-      }
+        `, [
+          `Station ${index + 1}`,
+          device.type,
+          'available',
+          device.location,
+          device.price_per_minute
+        ]);
+      });
 
       // Insert controllers
       for (const controller of seedData.controllers) {
@@ -183,9 +191,9 @@ export async function seedDatabase(db: Database) {
       // Insert games
       for (const game of seedData.games) {
         db.run(`
-          INSERT INTO games (name, price_per_minute, image, device_types, is_multiplayer)
-          VALUES (?, ?, ?, ?, ?)
-        `, [game.name, game.price_per_minute, game.image, JSON.stringify(game.device_types), game.is_multiplayer ? 1 : 0]);
+          INSERT INTO games (name, price_per_minute, image, device_types, is_multiplayer,is_active)
+          VALUES (?, ?, ?, ?, ?,?)
+        `, [game.name, game.price_per_minute, game.image, JSON.stringify(game.device_types), game.is_multiplayer ? 1 : 0,game.is_active?1:0]);
       }
     }
 
