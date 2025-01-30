@@ -9,7 +9,7 @@ import SessionSummary from './SessionSummary';
 import { useData } from '../contexts/DataContext';
 
 export default function StationGrid() {
-  const { stations,  updateStationSession } = useData();
+  const { tables,  updateStationSession } = useData();
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [showSessionControl, setShowSessionControl] = useState(false);
   const [games, setGames] = useState<Game[]>([]);
@@ -68,7 +68,7 @@ export default function StationGrid() {
     <div>
       <h2 className="text-2xl font-bold text-white mb-6">Gaming Stations</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {stations.map((station) => (
+        {Object.values(tables.stations.data).map((station) => (
           <div
             key={station.id}
             className={`rounded-xl border ${

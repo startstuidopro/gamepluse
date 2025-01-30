@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Product, Device, Controller, Game, Station, Session, DeviceType } from '../types';
+import { User, Product, Controller, Game, Station, Session, DeviceType } from '../types';
 import { getDatabase, waitForInit } from '../database';
 
 interface StationStats {
@@ -8,16 +8,21 @@ interface StationStats {
   totalDuration: number;
 }
 
-interface DataContextType {
-  users: User[];
-  products: Product[];
-  devices: Device[];
-  controllers: Controller[];
-  games: Game[];
-  stations: (Station & { currentSession?: Session; lastSession?: Session })[];
-  stationStats: StationStats;
-  isLoading: boolean;
+interface Table<T> {
+  data: Record<number, T>;
+  loading: boolean;
   error: string | null;
+}
+
+interface DataContextType {
+  tables: {
+    users: Table<User>;
+    products: Table<Product>;
+    controllers: Table<Controller>;
+    games: Table<Game>;
+    stations: Table<Station & { currentSession?: Session; lastSession?: Session }>;
+  };
+  stationStats: StationStats;
   refreshData: () => Promise<void>;
   updateStationSession: (stationId: number, session: Session | undefined) => void;
 }
@@ -25,19 +30,19 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | null>(null);
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
-  const [users, setUsers] = useState<User[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [controllers, setControllers] = useState<Controller[]>([]);
-  const [games, setGames] = useState<Game[]>([]);
-  const [stations, setStations] = useState<(Station & { currentSession?: Session; lastSession?: Session })[]>([]);
+  const [tables, setTables] = useState<DataContextType['tables']>({
+    users: { data: {}, loading: true, error: null },
+    products: { data: {}, loading: true, error: null },
+    controllers: { data: {}, loading: true, error: null },
+    games: { data: {}, loading: true, error: null },
+    stations: { data: {}, loading: true, error: null }
+  });
+
   const [stationStats, setStationStats] = useState<StationStats>({
     totalRevenue: 0,
     totalSessions: 0,
     totalDuration: 0
   });
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const calculateSessionCost = (session: Session): number => {
     const start_time = new Date(session.start_time).getTime();
@@ -91,117 +96,78 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loadData = async () => {
-    try {
-      await waitForInit();
-      const db = await getDatabase();
+    await waitForInit();
+    const db = await getDatabase();
 
-      const [
-        usersResult,
-        productsResult,
-        devicesResult,
-        controllersResult,
-        gamesResult,
-        stationsResult
-      ] = await Promise.all([
-        db.exec(`SELECT * FROM users`),
-        db.exec('SELECT * FROM products'),
-        db.exec('SELECT * FROM devices'),
-        db.exec('SELECT * FROM controllers'),
-        db.exec('SELECT * FROM games'),
-        db.exec('SELECT * FROM stations')
-      ]);
+    const loadTable = async <T extends { id: number }>(
+      tableName: keyof DataContextType['tables'],
+      query: string
+    ) => {
+      try {
+        const result = await db.exec(query);
+        const items = result[0]?.values.map((row: any[]) => {
+          const item = Object.fromEntries(
+            result[0].columns.map((col, index) => [col, row[index]])
+          ) as T;
+          
+          // Special handling for stations
+          if (tableName === 'stations') {
+            return {
+              ...item,
+              currentSession: undefined,
+              lastSession: undefined
+            } as T;
+          }
+          
+          return item;
+        }) || [];
 
-      // Convert query results to typed objects
-      const stationsData = stationsResult[0]?.values.map((row: any[]) => ({
-        id: row[0],
-        name: row[1],
-        status: row[2],
-        device_id: row[3],
-        type: row[4],
-        price_per_minute: row[5],
-        created_at: row[6],
-        updated_at: row[7],
-        location: row[8]
-      })) as Station[];
-      const usersData = usersResult[0]?.values.map(row => ({
-        id: row[0],
-        name: row[1],
-        phone: row[2],
-        password_hash: row[3],
-        role: row[4],
-        membership_type: row[5],
-        credit: row[6],
-        last_active: row[7],
-        created_at: row[8],
-        updated_at: row[9]
-      })) as User[];
+        setTables(prev => ({
+          ...prev,
+          [tableName]: {
+            data: Object.fromEntries(items.map(item => [item.id, item])),
+            loading: false,
+            error: null
+          }
+        }));
+      } catch (error) {
+        setTables(prev => ({
+          ...prev,
+          [tableName]: {
+            ...prev[tableName],
+            loading: false,
+            error: `Failed to load ${tableName}`
+          }
+        }));
+      }
+    };
 
-      const productsData = productsResult[0]?.values.map(row => ({
-        id: row[0],
-        name: row[1],
-        price: row[2],
-        cost: row[3],
-        category: row[4],
-        image: row[5],
-        stock: row[6],
-        barcode: row[7],
-        created_at: row[8],
-        updated_at: row[9]
-      })) as Product[];
+    await Promise.all([
+      loadTable<User>('users', 'SELECT * FROM users'),
+      loadTable<Product>('products', 'SELECT * FROM products'),      
+      loadTable<Controller>('controllers', 'SELECT * FROM controllers'),
+      loadTable<Game>('games', 'SELECT * FROM games'),
+      loadTable<Station>('stations', 'SELECT * FROM stations')
+    ]);
 
-      const devicesData = devicesResult[0]?.values.map(row => ({
-        id: row[0],
-        name: row[1],
-        type: row[2],
-        status: row[3],
-        location: row[4],
-        price_per_minute: row[5],
-        created_at: row[6],
-        updated_at: row[7]
-      })) as Device[];
-
-      const controllersData = controllersResult[0]?.values.map(row => ({
-        id: row[0],
-        name: row[1],
-        type: row[2],
-        status: row[3],
-        price_per_minute: row[4],
-        color: row[5],
-        created_at: row[6],
-        updated_at: row[7],
-        identifier: `CTRL-${row[0]}`,
-        last_maintenance: new Date().toISOString()
-      })) as Controller[];
-
-      const gamesData = gamesResult[0]?.values.map(row => ({
-        id: row[0],
-        name: row[1],
-        price_per_minute: row[2],
-        image: row[3],
-        is_multiplayer: Boolean(row[5]),
-        created_at: row[6],
-        updated_at: row[7],
-        device_types: [row[4]] as DeviceType[]
-      })) as Game[];
-      console.log(gamesData);
-      setUsers(usersData);
-      setProducts(productsData);
-      setDevices(devicesData);
-      setControllers(controllersData);
-      setStations(stationsData)
-      setGames(gamesData);
-
-      setError(null);
-    } catch (error) {
-      setError('Failed to load data');
-      console.error('Error loading data:', error);
-    } finally {
-      setIsLoading(false);
+    // After all tables loaded, check if any have errors
+    const hasErrors = Object.values(tables).some(table => table.error);
+    if (hasErrors) {
+      console.error('Some tables failed to load');
     }
   };
 
   const refreshData = async () => {
-    setIsLoading(true);
+    // Set all tables to loading state
+    setTables(prev => ({
+      users: { ...prev.users, loading: true },
+      products: { ...prev.products, loading: true },
+     
+      controllers: { ...prev.controllers, loading: true },
+      games: { ...prev.games, loading: true },
+      stations: { ...prev.stations, loading: true }
+    }));
+    
     await loadData();
   };
 
@@ -211,9 +177,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <DataContext.Provider value={{ 
-      users, products, devices, controllers, games,
-      stations, stationStats, isLoading, error, 
-      refreshData, updateStationSession
+      tables,
+      stationStats,
+      refreshData,
+      updateStationSession
     }}>
       {children}
     </DataContext.Provider>
