@@ -1,6 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User, Product, Controller, Game, Station, Session, DeviceType } from '../types';
 import { getDatabase, waitForInit } from '../database';
+import { SessionModel } from '../database/models/SessionModel';
+import { StationModel } from '../database/models/StationModel';
 
 interface StationStats {
   totalRevenue: number;
@@ -22,9 +24,12 @@ interface DataContextType {
     games: Table<Game>;
     stations: Table<Station & { currentSession?: Session; lastSession?: Session }>;
   };
+  setTables: React.Dispatch<React.SetStateAction<DataContextType['tables']>>;
   stationStats: StationStats;
   refreshData: () => Promise<void>;
-  updateStationSession: (stationId: number, session: Session | undefined) => void;
+  updateStationSession: (stationId: number, sessionId: number | null) => Promise<void>;
+  stations: Station[];
+  setStations: React.Dispatch<React.SetStateAction<Station[]>>;
 }
 
 const DataContext = createContext<DataContextType | null>(null);
@@ -43,6 +48,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     totalSessions: 0,
     totalDuration: 0
   });
+
+  const [stations, setStations] = useState<Station[]>([]);
 
   const calculateSessionCost = (session: Session): number => {
     const start_time = new Date(session.start_time).getTime();
@@ -65,35 +72,27 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
-  const updateStationSession = (stationId: number, session: Session | undefined) => {
-    setStations(current => current.map(station => {
-      if (station.id === stationId) {
-        // If ending a session, store it as lastSession and update stats
-        if (station.currentSession && !session) {
-          const endedSession = {
-            ...station.currentSession,
-            endTime: new Date().toISOString(),
-            totalAmount: calculateSessionCost(station.currentSession)
-          };
-          updateStationStats(endedSession);
-          return {
-            ...station,
-            status: 'available',
-            currentSession: undefined,
-            lastSession: endedSession
-          };
-        }
-        // Starting new session, clear lastSession
-        return {
-          ...station,
-          status: session ? 'occupied' : 'available',
-          currentSession: session,
-          lastSession: undefined
-        };
+  const updateStationSession = useCallback(async (stationId: number, sessionId: number | null) => {
+    try {
+      const stationModel = await StationModel.getInstance();
+      const result = await stationModel.updateSession(stationId, sessionId);
+      
+      if (result.success) {
+        // Update local state
+        setStations(prevStations => 
+          prevStations.map(station => 
+            station.id === stationId 
+              ? { ...station, current_session_id: sessionId }
+              : station
+          )
+        );
+      } else {
+        console.error('Failed to update station session:', result.error);
       }
-      return station;
-    }));
-  };
+    } catch (error) {
+      console.error('Error updating station session:', error);
+    }
+  }, []);
 
   const loadData = async () => {
     await waitForInit();
@@ -175,13 +174,18 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     loadData();
   }, []);
 
+  const value = {
+    tables,
+    setTables,
+    stationStats,
+    refreshData,
+    updateStationSession,
+    stations,
+    setStations
+  };
+
   return (
-    <DataContext.Provider value={{ 
-      tables,
-      stationStats,
-      refreshData,
-      updateStationSession
-    }}>
+    <DataContext.Provider value={value}>
       {children}
     </DataContext.Provider>
   );

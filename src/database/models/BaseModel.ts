@@ -72,15 +72,14 @@ export class BaseModel {
         }
     }
 
-    protected async transaction<T>(callback: (db: Database) => Promise<QueryResult<T>>): Promise<QueryResult<T>> {
-        const db = await this.getDb();
+    protected async transaction<T>(callback: () => Promise<T>): Promise<T> {
         try {
-            await db.exec('BEGIN TRANSACTION');
-            const result = await callback(db);
-            await db.exec('COMMIT');
+            this.db.exec('BEGIN TRANSACTION');
+            const result = await callback();
+            this.db.exec('COMMIT');
             return result;
         } catch (error) {
-            await db.exec('ROLLBACK');
+            this.db.exec('ROLLBACK');
             throw error;
         }
     }

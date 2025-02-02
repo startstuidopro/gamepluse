@@ -1,11 +1,11 @@
 import { BaseModel } from './BaseModel';
-import { Device, DeviceType, DeviceStatus, QueryResult } from '../../types';
+import { Station, DeviceType, DeviceStatus, QueryResult } from '../../types';
 
 export class DeviceModel extends BaseModel {
     private static instance: DeviceModel;
 
     private constructor() {
-        super('devices');
+        super('stations');
     }
 
     public static getInstance(): DeviceModel {
@@ -15,14 +15,14 @@ export class DeviceModel extends BaseModel {
         return DeviceModel.instance;
     }
 
-    async create(device: Omit<Device, 'id' | 'created_at' | 'updated_at'>): Promise<QueryResult<number>> {
+    async create(device: Omit<Station, 'id' | 'created_at' | 'updated_at'>): Promise<QueryResult<number>> {
         return this.handleQuery(async () => {
             const columns = Object.keys(device).join(', ');
             const values = Object.values(device);
             const placeholders = values.map(() => '?').join(', ');
             
             return this.withStatement(
-                `INSERT INTO devices (${columns}) VALUES (${placeholders})`,
+                `INSERT INTO stations (${columns}) VALUES (${placeholders})`,
                 async (stmt): Promise<QueryResult<number>> => {
                     try {
                         stmt.bind(values);
@@ -56,7 +56,7 @@ export class DeviceModel extends BaseModel {
         });
     }
 
-    async update(id: number, device: Partial<Device>): Promise<QueryResult<void>> {
+    async update(id: number, device: Partial<Station>): Promise<QueryResult<void>> {
         return this.handleQuery(async () => {
             const result = await this.findById(id);
             if (!result.success || !result.data) {
@@ -73,7 +73,7 @@ export class DeviceModel extends BaseModel {
             const values = Object.values(device);
             
             return this.withStatement(
-                `UPDATE devices SET ${setClause} WHERE id = ?`,
+                `UPDATE stations SET ${setClause} WHERE id = ?`,
                 async (stmt): Promise<QueryResult<void>> => {
                     try {
                         stmt.bind([...values, id]);
@@ -94,7 +94,7 @@ export class DeviceModel extends BaseModel {
     async updateStatus(id: number, status: DeviceStatus): Promise<QueryResult<void>> {
         return this.handleQuery(async () => {
             return this.withStatement(
-                `UPDATE devices SET status = ? WHERE id = ?`,
+                `UPDATE stations SET status = ? WHERE id = ?`,
                 async (stmt): Promise<QueryResult<void>> => {
                     try {
                         stmt.bind([status, id]);
@@ -112,11 +112,11 @@ export class DeviceModel extends BaseModel {
         });
     }
 
-    async findById(id: number): Promise<QueryResult<Device>> {
+    async findById(id: number): Promise<QueryResult<Station>> {
         return this.handleQuery(async () => {
             return this.withStatement(
-                `SELECT * FROM devices WHERE id = ?`,
-                async (stmt): Promise<QueryResult<Device>> => {
+                `SELECT * FROM stations WHERE id = ?`,
+                async (stmt): Promise<QueryResult<Station>> => {
                     try {
                         stmt.bind([id]);
                         if (stmt.step()) {
@@ -153,14 +153,14 @@ export class DeviceModel extends BaseModel {
         });
     }
 
-    async findByType(type: DeviceType): Promise<QueryResult<Device[]>> {
+    async findByType(type: DeviceType): Promise<QueryResult<Station[]>> {
         return this.handleQuery(async () => {
             return this.withStatement(
-                `SELECT * FROM devices WHERE type = ?`,
-                async (stmt): Promise<QueryResult<Device[]>> => {
+                `SELECT * FROM stations WHERE type = ?`,
+                async (stmt): Promise<QueryResult<Station[]>> => {
                     try {
                         stmt.bind([type]);
-                        const results: Device[] = [];
+                        const results: Station[] = [];
                         while (stmt.step()) {
                             const row = stmt.getAsObject();
                             results.push({
@@ -187,13 +187,13 @@ export class DeviceModel extends BaseModel {
         });
     }
 
-    async findAvailable(): Promise<QueryResult<Device[]>> {
+    async findAvailable(): Promise<QueryResult<Station[]>> {
         return this.handleQuery(async () => {
             return this.withStatement(
-                `SELECT * FROM devices WHERE status = 'available' ORDER BY type, name`,
-                async (stmt): Promise<QueryResult<Device[]>> => {
+                `SELECT * FROM stations WHERE status = 'available' ORDER BY type, name`,
+                async (stmt): Promise<QueryResult<Station[]>> => {
                     try {
-                        const results: Device[] = [];
+                        const results: Station[] = [];
                         while (stmt.step()) {
                             const row = stmt.getAsObject();
                             results.push({
@@ -220,14 +220,14 @@ export class DeviceModel extends BaseModel {
         });
     }
 
-    async findAvailableByType(type: DeviceType): Promise<QueryResult<Device[]>> {
+    async findAvailableByType(type: DeviceType): Promise<QueryResult<Station[]>> {
         return this.handleQuery(async () => {
             return this.withStatement(
-                `SELECT * FROM devices WHERE type = ? AND status = 'available' ORDER BY name`,
-                async (stmt): Promise<QueryResult<Device[]>> => {
+                `SELECT * FROM stations WHERE type = ? AND status = 'available' ORDER BY name`,
+                async (stmt): Promise<QueryResult<Station[]>> => {
                     try {
                         stmt.bind([type]);
-                        const results: Device[] = [];
+                        const results: Station[] = [];
                         while (stmt.step()) {
                             const row = stmt.getAsObject();
                             results.push({
@@ -254,19 +254,19 @@ export class DeviceModel extends BaseModel {
         });
     }
 
-    async getDeviceWithCurrentSession(id: number): Promise<QueryResult<Device & { current_session?: any }>> {
+    async getDeviceWithCurrentSession(id: number): Promise<QueryResult<Station & { current_session?: any }>> {
         return this.handleQuery(async () => {
             return this.withStatement(
                 `SELECT d.*, 
                        s.id as session_id,
                        s.start_time,
-                       s.user_id,
+                       s.user,
                        u.name as user_name
-                FROM devices d
-                LEFT JOIN sessions s ON d.id = s.device_id AND s.end_time IS NULL
-                LEFT JOIN users u ON s.user_id = u.id
+                FROM stations d
+                LEFT JOIN sessions s ON d.id = s.station_id AND s.end_time IS NULL
+                LEFT JOIN users u ON s.user = u.id
                 WHERE d.id = ?`,
-                async (stmt): Promise<QueryResult<Device & { current_session?: any }>> => {
+                async (stmt): Promise<QueryResult<Station & { current_session?: any }>> => {
                     try {
                         stmt.bind([id]);
                         if (stmt.step()) {
@@ -314,7 +314,7 @@ export class DeviceModel extends BaseModel {
                     SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) as available,
                     SUM(CASE WHEN status = 'occupied' THEN 1 ELSE 0 END) as occupied,
                     SUM(CASE WHEN status = 'maintenance' THEN 1 ELSE 0 END) as maintenance
-                FROM devices`,
+                FROM stations`,
                 async (stmt): Promise<QueryResult<{
                     total: number;
                     available: number;
@@ -348,7 +348,7 @@ export class DeviceModel extends BaseModel {
 
             const byType = await this.withStatement(
                 `SELECT type, COUNT(*) as count
-                FROM devices
+                FROM stations
                 GROUP BY type
                 ORDER BY type`,
                 async (stmt): Promise<QueryResult<Array<{type: DeviceType; count: number}>>> => {

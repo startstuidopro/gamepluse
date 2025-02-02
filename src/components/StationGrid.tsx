@@ -1,4 +1,4 @@
-import  { useState, useEffect } from 'react';
+import  { useState, useEffect, useCallback } from 'react';
 import { PlaySquare } from 'lucide-react';
 import { Session, Game, DeviceType } from '../types';
 import type { Station } from '../types';
@@ -7,9 +7,10 @@ import SessionControl from './SessionControl';
 import SessionTimer from './SessionTimer';
 import SessionSummary from './SessionSummary';
 import { useData } from '../contexts/DataContext';
+import { SessionModel } from '../database/models/SessionModel';
 
 export default function StationGrid() {
-  const { tables,  updateStationSession } = useData();
+  const { tables,  updateStationSession, setTables } = useData();
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [showSessionControl, setShowSessionControl] = useState(false);
   const [games, setGames] = useState<Game[]>([]);
@@ -43,6 +44,41 @@ export default function StationGrid() {
     loadGames();
   }, []);
 
+  useEffect(() => {
+    const loadActiveSessions = async () => {
+        const sessionModel = await SessionModel.getInstance();
+        console.log('stations', Object.values(tables.stations.data));
+        
+        const updatedStations = { ...tables.stations.data };
+        
+        for (const station of Object.values(tables.stations.data)) {
+            if (station.current_session_id) {
+                const result = await sessionModel.getActiveSession(station.id);
+                if (result.success && result.data) {
+                    updatedStations[station.id] = {
+                        ...station,
+                        currentSession: result.data
+                    };
+                }
+            }
+        }
+
+        // console.log("updatedStations",updatedStations);
+
+        setTables(prev => ({
+            ...prev,
+            stations: {
+                ...prev.stations,
+                data: updatedStations
+            }
+        }));
+    };
+
+    if (!tables.stations.loading && Object.keys(tables.stations.data).length > 0) {
+        loadActiveSessions();
+    }
+  }, []);
+
   const getStatusColor = (status: Station['status']) => {
     switch (status) {
       case 'available':
@@ -59,10 +95,9 @@ export default function StationGrid() {
     setShowSessionControl(true);
   };
 
-  const handleSessionUpdate = (stationId: number, session: Session | undefined) => {
-    updateStationSession(stationId, session);
-    setShowSessionControl(false);
-  };
+  const handleSessionUpdate = useCallback(async (stationId: number, sessionId: number | null) => {
+    await updateStationSession(stationId, sessionId);
+  }, [updateStationSession]);
 
   return (
     <div>
@@ -85,18 +120,28 @@ export default function StationGrid() {
               </div>
               <PlaySquare className="h-6 w-6" />
             </div>
-
             {station.status === 'occupied' && station.currentSession && (
               <div className="space-y-3 mb-4">
                 <SessionTimer session={station.currentSession} />
                 <div className="space-y-1">
-                  <p className="text-sm text-slate-400">User: {station.currentSession.user_id}</p>
-                  <p className="text-sm text-slate-400">Game: {station.currentSession.game?.name}</p>
-                  {station.currentSession.attached_controllers && station.currentSession.attached_controllers.length > 0 && (
+                  <p className="text-sm text-slate-400">
+                    User: {station.currentSession.user.name} 
+                    ({station.currentSession.user.membership_type})
+                  </p>
+                  {station.currentSession.game && (
+                    <p className="text-sm text-slate-400">
+                      Game: {station.currentSession.game.name}
+                    </p>
+                  )}
+                  {station.currentSession.attached_controllers && 
+                   station.currentSession.attached_controllers.length > 0 && (
                     <p className="text-sm text-slate-400">
                       Controllers: {station.currentSession.attached_controllers.length}
                     </p>
                   )}
+                  <p className="text-sm text-slate-400">
+                    Rate: ${station.currentSession.final_price}/min
+                  </p>
                 </div>
               </div>
             )}

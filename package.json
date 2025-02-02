@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview"
   },
-  "dependencies": {   
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
     "concurrently": "^8.2.2",
     "express": "^4.18.3",
     "jsbarcode": "^3.11.6",
@@ -18,6 +19,7 @@
     "react-dom": "^18.3.1",
     "react-webcam": "^7.2.0",
     "sql.js": "^1.12.0",
+    "sqlite3": "^5.1.7",
     "wake_on_lan": "^1.0.0"
   },
   "devDependencies": {

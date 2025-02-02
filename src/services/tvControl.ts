@@ -1,4 +1,4 @@
-import { Device } from '../types';
+import { Station } from '../types';
 
 interface TVControlConfig {
   ip: string;
@@ -24,7 +24,7 @@ export class TVControlService {
     return this.instance;
   }
 
-  async turnOnTV(station: Device): Promise<void> {
+  async turnOnTV(station: Station): Promise<void> {
     const config = TV_CONFIGS[station.location];
     if (!config) {
       console.error(`No TV configuration found for station: ${station.location}`);
@@ -56,7 +56,7 @@ export class TVControlService {
     }
   }
 
-  async turnOffTV(station: Device): Promise<void> {
+  async turnOffTV(station: Station): Promise<void> {
     const config = TV_CONFIGS[station.location];
     if (!config) {
       console.error(`No TV configuration found for station: ${station.location}`);

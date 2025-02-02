@@ -3,12 +3,12 @@ import { Session, QueryResult } from '../types';
 
 export const sessionService = {
     createSession: async (session: Omit<Session, 'id' | 'created_at' | 'updated_at'> & {
-        device_id: number; // Added required device_id
+        station_id: number; // Added required device_id
     }, controllerIds: number[]): Promise<QueryResult<number>> => {
         const instance = await SessionModel.getInstance();
         return instance.create({
             ...session,
-            device_id: session.device_id // Explicitly include device_id
+            station_id: session.station_id // Explicitly include device_id
         }, controllerIds);
     },
 

@@ -20,7 +20,8 @@ export interface Station {
   status: DeviceStatus;
   location: string;
   price_per_minute: number;
-  current_session_id?: number;
+  current_session_id: number | null;
+  currentSession?: Session;
   last_session_id?: number;
   created_at?: string;
   updated_at?: string;
@@ -39,6 +40,9 @@ export interface Session {
     id: number;
     name: string;
     price_per_minute: number;
+    image: string;
+    device_types: DeviceType[];
+    is_multiplayer: boolean;
   };
   created_by: {
     id: number;
@@ -50,6 +54,7 @@ export interface Session {
   discount_rate: number;
   final_price: number;
   total_amount?: number;
+  price_per_minute: number;
   attached_controllers: Controller[];
   created_at?: string;
 }

@@ -1,4 +1,4 @@
-import { Product, Device, Controller, Game } from '../types';
+import { Product, Station, Controller, Game } from '../types';
 
 export const seedData = {
   products: [
@@ -31,7 +31,7 @@ export const seedData = {
     }
   ] as Omit<Product, 'id'>[],
 
-  devices: [
+  stations: [
     {
       name: 'PS5-01',
       type: 'PS5' as const,
@@ -60,7 +60,7 @@ export const seedData = {
       location: 'Station 4',
       price_per_minute: 0.3
     }
-  ] as Omit<Device, 'id'>[],
+  ] as Omit<Station, 'id'>[],
 
   controllers: [
     {

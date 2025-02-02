@@ -46,7 +46,7 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
           id: Number(row[0]),
           name: String(row[1]),
           type: String(row[2]) as DeviceType,
-          status: (String(row[3]) === 'in-use' ? 'in_use' : String(row[3])) as 'available' | 'in_use' | 'maintenance',
+          status: (String(row[3]) === 'in-use' ? 'in-use' : String(row[3])) as 'available' | 'in-use' | 'maintenance',
           price_per_minute: Number(row[4]),
           color: row[5] ? String(row[5]) : undefined,          
           identifier: '',
@@ -102,7 +102,7 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
     try {
       db = await getDatabase();
       const result = db.exec(`
-        SELECT id FROM devices 
+        SELECT id FROM stations 
         WHERE id = ${station.id}
       `);
       
@@ -194,23 +194,33 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
       }
 
       const sessionData: Omit<Session, 'id' | 'created_at' | 'updated_at'> = {
-        device_id: station.device_id,
-        user_id: userId,
-        user_name: formData.userName,
-        game_id: gameId || undefined,
+        station_id: station.id,
+        user: {
+          id: userId,
+          name: formData.userName,
+          membership_type: formData.userMembershipType,
+        },
+        game: {
+          id: gameId || undefined,
+          // name:,
+          // price_per_minute:,
+        },
+        created_by: {
+          id: userId,
+          name: formData.userName,
+        },
         start_time: new Date().toISOString(),
         base_price: station.price_per_minute,
         discount_rate: discountRate,
         final_price: finalPrice,
         attached_controllers: selectedControllers,
-        user_membership_type: formData.userMembershipType,
-        created_by: userId,device_name:station.name,device_type:station.type,
-        
+        device_name: station.name,
+        device_type: station.type,
       };
 
       console.log('Creating session with data:', {
         ...sessionData,
-        device_id: station.device_id,
+        station: station.id,
         base_price: basePrice,
         final_price: finalPrice
       });
@@ -221,7 +231,7 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
       
       const result = await sessionService.createSession({
         ...sessionData,
-        device_id: station.id 
+        station_id: station.id 
       }, validControllerIds);
 
       if (result.success && result.data) {
@@ -261,28 +271,28 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
   const tvService = TVControlService.getInstance();
 
   useEffect(() => {
-    if (station.current_session?.attached_controllers) {
-      setSelectedControllers(station.current_session.attached_controllers);
+    if (station.currentSession?.attached_controllers) {
+      setSelectedControllers(station.currentSession.attached_controllers);
     }
-  }, [station.current_session]);
+  }, [station.currentSession]);
 
   const handleEndSession = async () => {
     setError(null);
     setLoading(true);
 
     try {
-      if (station.current_session) {
+      if (station.currentSession) {
         // Turn off the TV
         await tvService.turnOffTV(station);
 
         const endTime = new Date().toISOString();
-        const startTime = new Date(station.current_session.start_time).getTime();
+        const startTime = new Date(station.currentSession.start_time).getTime();
         const endTimeMs = new Date(endTime).getTime();
         const minutesElapsed = Math.floor((endTimeMs - startTime) / 1000 / 60);
         const totalAmount = minutesElapsed * station.price_per_minute;
 
         const endedSession: Session = {
-          ...station.current_session,
+          ...station.currentSession,
           end_time: endTime,
           total_amount: totalAmount,
         };
@@ -305,12 +315,12 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
     const updatedControllers = [...selectedControllers, controller];
     setSelectedControllers(updatedControllers);
 
-    if (station.current_session) {
+    if (station.currentSession) {
       const basePrice = calculateBasePrice();
-      const discountedPrice = calculateDiscountedPrice(basePrice, station.current_session.user_membership_type);
+      const discountedPrice = calculateDiscountedPrice(basePrice, station.currentSession.user_membership_type);
 
       const updatedSession: Session = {
-        ...station.current_session,
+        ...station.currentSession,
         attached_controllers: updatedControllers,
         final_price: discountedPrice,
         base_price: basePrice
@@ -323,12 +333,12 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
     const updatedControllers = selectedControllers.filter(c => c.id !== controller.id);
     setSelectedControllers(updatedControllers);
 
-    if (station.current_session) {
+    if (station.currentSession) {
       const basePrice = calculateBasePrice();
-      const discountedPrice = calculateDiscountedPrice(basePrice, station.current_session.user_membership_type);
+      const discountedPrice = calculateDiscountedPrice(basePrice, station.currentSession.user_membership_type);
 
       const updatedSession: Session = {
-        ...station.current_session,
+        ...station.currentSession,
         attached_controllers: updatedControllers,
         final_price: discountedPrice,
         base_price: basePrice
@@ -471,34 +481,34 @@ export default function SessionControl({ station, onClose, onUpdateSession, game
           </form>
         ) : (
           <div className="space-y-6">
-            {station.current_session && (
+            {station.currentSession && (
               <>
                 <div className="space-y-2">
                   <p className="text-slate-400">
-                    User: <span className="text-white">{station.current_session.user_id}</span>
+                    User: <span className="text-white">{station.currentSession.user.name}</span>
                   </p>
                   <p className="text-slate-400">
-                    Membership: <span className="text-white capitalize">{station.current_session.user_membership_type}</span>
-                    {station.current_session.user_membership_type === 'premium' && (
+                    Membership: <span className="text-white capitalize">{station.currentSession.user.membership_type}</span>
+                    {station.currentSession.user.membership_type === 'premium' && (
                       <span className="text-green-400 ml-2">({PRICING_CONFIG.premiumDiscount * 100}% off)</span>
                     )}
                   </p>
                   <p className="text-slate-400">
-                    Game: <span className="text-white">{station.current_session.game?.name}</span>
+                    Game: <span className="text-white">{station.currentSession.game?.name}</span>
                   </p>
                   <p className="text-slate-400">
                     Started: <span className="text-white">
-                      {new Date(station.current_session.start_time).toLocaleString()}
+                      {new Date(station.currentSession.start_time).toLocaleString()}
                     </span>
                   </p>
                   <p className="text-slate-400">
                     Base Price: <span className="text-white">
-                      ${station.current_session.base_price.toFixed(2)}/min
+                      ${station.currentSession.base_price.toFixed(2)}/min
                     </span>
                   </p>
                   <p className="text-slate-400">
                     Final Price: <span className="text-white">
-                      ${station.current_session.final_price.toFixed(2)}/min
+                      ${station.currentSession.final_price.toFixed(2)}/min
                     </span>
                   </p>
                 </div>

@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Device, DeviceType } from '../../types';
+import { Station, DeviceType } from '../../types';
 import { Plus, Monitor, Pencil, Trash2, DollarSign } from 'lucide-react';
 import { DeviceModel } from '../../database/models/DeviceModel';
 const deviceModel = DeviceModel.getInstance();
 
 export default function DeviceManager() {
-  const [devices, setDevices] = useState<Device[]>([]);
+  const [devices, setDevices] = useState<Station[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [editingDevice, setEditingDevice] = useState<Device | null>(null);
+  const [editingDevice, setEditingDevice] = useState<Station | null>(null);
 
   useEffect(() => {
     const fetchDevices = async () => {
@@ -33,7 +33,7 @@ export default function DeviceManager() {
     name: '',
     type: 'PS5' as DeviceType,
     location: '',
-    status: 'available' as Device['status'],
+    status: 'available' as Station['status'],
     price_per_minute: 0.3
   });
 
@@ -68,7 +68,7 @@ export default function DeviceManager() {
     }
   };
 
-  const handleEdit = (device: Device) => {
+  const handleEdit = (device: Station) => {
     setEditingDevice(device);
     setFormData({
       name: device.name,

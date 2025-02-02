@@ -7,8 +7,8 @@ interface SessionSummaryProps {
 }
 
 export default function SessionSummary({ session }: SessionSummaryProps) {
-  const startTime = new Date(session.startTime);
-  const endTime = new Date(session.endTime!);
+  const startTime = new Date(session.start_time);
+  const endTime = new Date(session.end_time!);
   const duration = Math.floor((endTime.getTime() - startTime.getTime()) / 1000); // in seconds
 
   const formatTime = (totalSeconds: number): string => {
@@ -24,7 +24,7 @@ export default function SessionSummary({ session }: SessionSummaryProps) {
       
       <div className="flex items-center gap-2 text-slate-300">
         <User className="h-4 w-4" />
-        <span>User: {session.userId}</span>
+        <span>User: {session.user.id}</span>
       </div>
 
       <div className="flex items-center gap-2 text-slate-300">
@@ -39,12 +39,12 @@ export default function SessionSummary({ session }: SessionSummaryProps) {
 
       <div className="flex items-center gap-2 text-green-400 font-medium">
         <DollarSign className="h-4 w-4" />
-        <span>Total Cost: ${session.totalAmount?.toFixed(2)}</span>
+        <span>Total Cost: ${session.total_amount?.toFixed(2)}</span>
       </div>
 
-      {session.userMembershipType === 'premium' && (
+      {session.user.membership_type === 'premium' && (
         <div className="text-xs text-purple-400">
-          Premium discount applied: {(session.discountRate * 100)}% off
+          Premium discount applied: {(session.discount_rate * 100)}% off
         </div>
       )}
     </div>

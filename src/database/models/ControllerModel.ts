@@ -1,5 +1,6 @@
 import { BaseModel } from './BaseModel';
 import { Controller, ControllerStatus, QueryResult } from '../../types';
+import { Database } from 'sql.js';
 
 export class ControllerModel extends BaseModel {
     private static instance: ControllerModel;
@@ -17,28 +18,36 @@ export class ControllerModel extends BaseModel {
 
     // Prepared statements
     private async createStmt() {
-        return this.prepareStatement(`
+        const db = await this.getDb();
+
+        return db.prepare(`
             INSERT INTO controllers (name, type, status, price_per_minute, color, identifier, last_maintenance)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         `);
     }
 
     private async updateStmt() {
-        return this.prepareStatement(`
+        const db = await this.getDb();
+
+        return db.prepare(`
             UPDATE controllers 
-            SET name = ?, type = ?, status = ?, price_per_minute = ?, color = ?
-            WHERE id = ?, identifier = ?, last_maintenance = ?
+            SET name = ?, type = ?, status = ?, price_per_minute = ?, color = ?, identifier = ?, last_maintenance = ?
+            WHERE id = ?
         `);
     }
 
     private async updateStatusStmt() {
-        return this.prepareStatement(`
+        const db = await this.getDb();
+
+        return db.prepare(`
             UPDATE controllers SET status = ? WHERE id = ?
         `);
     }
 
     private async findByIdStmt() {
-        return this.prepareStatement(`
+        const db = await this.getDb();
+
+        return db.prepare(`
             SELECT c.*
             FROM controllers c
             WHERE c.id = ?
@@ -49,21 +58,27 @@ export class ControllerModel extends BaseModel {
         return this.handleQuery(async () => {
             const stmt = await this.createStmt();
             try {
-                const result = await stmt.run(
+                await stmt.run([
                     controller.name,
                     controller.type,
-                    controller.identifier,
                     controller.status,
+                    controller.price_per_minute,
+                    controller.color,
+                    controller.identifier,
                     controller.last_maintenance ?? new Date().toISOString()
-                );
+                ]);
+
+                const db = await this.getDb();
+                const contollerId = (db as Database).exec('SELECT last_insert_rowid() as id')[0].values[0][0] as number;
+
                 return { 
                     success: true,
-                    data: { id: Number(result.lastInsertRowid) },
+                    data: { id: Number(contollerId) },
                     changes: 1,
-                    lastInsertId: Number(result.lastInsertRowid)
+                    lastInsertId: Number(contollerId)
                 };
             } finally {
-                await this.freeStatement(stmt);
+                await stmt.free();
             }
         });
     }
@@ -71,8 +86,8 @@ export class ControllerModel extends BaseModel {
     async update(id: number, controller: Partial<Controller>): Promise<QueryResult<void>> {
         return this.handleQuery(async () => {
             const findStmt = await this.findByIdStmt();
-            const current = await findStmt.get(id);
-            await this.freeStatement(findStmt);
+            const current = await findStmt.getAsObject([id]);
+            await findStmt.free();
 
             if (!current) {
                 throw new Error('Controller not found');
@@ -80,18 +95,18 @@ export class ControllerModel extends BaseModel {
 
             const updateStmt = await this.updateStmt();
             try {
-                await updateStmt.run(
+                await updateStmt.run([
                     controller.name ?? current.name,
                     controller.type ?? current.type,
                     controller.status ?? current.status,
+                    controller.price_per_minute ?? current.price_per_minute,
+                    controller.color ?? current.color,
                     controller.identifier ?? current.identifier,
-                    controller.status ?? current.status,
-                    controller.last_maintenance ?? current.last_maintenance,
-                    id
-                );
+                    controller.last_maintenance ?? current.last_maintenance
+                ]);
                 return { success: true, changes: 1 };
             } finally {
-                await this.freeStatement(updateStmt);
+                await updateStmt.free();
             }
         });
     }
@@ -130,7 +145,7 @@ export class ControllerModel extends BaseModel {
         return this.handleQuery(async () => {
             const stmt = await this.findByIdStmt();
             try {
-                const result = await stmt.get(id);
+                const result = await stmt.getAsObject([id]);  
                 if (!result) {
                     throw new Error('Controller not found');
                 }
@@ -140,7 +155,7 @@ export class ControllerModel extends BaseModel {
                     changes: 0 
                 };
             } finally {
-                await this.freeStatement(stmt);
+                await stmt.free();
             }
         });
     }
@@ -322,9 +337,12 @@ export class ControllerModel extends BaseModel {
     async delete(id: number): Promise<QueryResult<boolean>> {
         return this.handleQuery(async () => {
             return this.transaction(async () => {
+                const db = await this.getDb();
+
                 const findStmt = await this.findByIdStmt();
-                const controller = await findStmt.get(id);
-                await this.freeStatement(findStmt);
+                const controller = await findStmt.getAsObject([id]);
+                console.log('controller', controller);
+                await findStmt.free();
 
                 if (!controller) {
                     return { 
@@ -333,7 +351,7 @@ export class ControllerModel extends BaseModel {
                         data: false 
                     };
                 }
-                if (controller.status === 'in_use') {
+                if (controller.status === 'in-use') {
                     return { 
                         success: false,
                         changes: 0,
@@ -342,23 +360,25 @@ export class ControllerModel extends BaseModel {
                 }
 
                 // Remove any session assignments
-                const deleteAssignmentsStmt = await this.prepareStatement(
+                const deleteAssignmentsStmt = await db.prepare(
                     'DELETE FROM session_controllers WHERE controller_id = ?'
                 );
-                await deleteAssignmentsStmt.run(id);
-                await this.freeStatement(deleteAssignmentsStmt);
+                await deleteAssignmentsStmt.run([id]);
+                await deleteAssignmentsStmt.free();
 
                 // Delete controller
-                const deleteStmt = await this.prepareStatement(
+                const deleteStmt = await db.prepare(
                     'DELETE FROM controllers WHERE id = ?'
                 );
-                const result = await deleteStmt.run(id);
-                await this.freeStatement(deleteStmt);
+                const result = await deleteStmt.run([id]);
+
+                console.log('result', result);
+                await deleteStmt.free();
 
                 return { 
-                    success: result.changes > 0,
-                    changes: result.changes,
-                    data: result.changes > 0 
+                    success: result,
+                    changes: result,
+                    data: result 
                 };
             });
         });

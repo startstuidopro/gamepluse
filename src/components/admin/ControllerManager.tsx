@@ -11,7 +11,7 @@ export default function ControllerManager() {
   useEffect(() => {
     const fetchControllers = async () => {
       try {
-        const result = await ControllerModel.getInstance().findAvailable();       
+        const result = await ControllerModel.getInstance().findAvailable();  
         if (result.success && result.data) {
           setControllers(result.data);
         } else {
@@ -244,7 +244,7 @@ export default function ControllerManager() {
                   Last Maintenance
                 </label>
                 <input
-                  type="datetime-local"
+                  type="date"
                   value={formData.last_maintenance}
                   onChange={e => setFormData({ ...formData, last_maintenance: e.target.value })}
                   className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500"
