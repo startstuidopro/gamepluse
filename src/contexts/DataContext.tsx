@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { User, Product, Controller, Game, Station, Session, DeviceType } from '../types';
+import { User, Product, Controller, Game, Station, Session,  } from '../types';
 import { getDatabase, waitForInit } from '../database';
-import { SessionModel } from '../database/models/SessionModel';
 import { StationModel } from '../database/models/StationModel';
 
 interface StationStats {

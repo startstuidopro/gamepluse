@@ -1,41 +1,6 @@
 import { Database } from 'sql.js';
 import { seedData } from './seedData';
 
-// CREATE TABLE IF NOT EXISTS sessions (
-//   id INTEGER PRIMARY KEY AUTOINCREMENT,
-//   station_id INTEGER NOT NULL,
-//   user JSON NOT NULL,
-//   game JSON,
-//   created_by JSON NOT NULL,
-//   start_time DATETIME NOT NULL,
-//   end_time DATETIME,
-//   base_price DECIMAL(10, 2) NOT NULL,
-//   discount_rate DECIMAL(4, 2) NOT NULL,
-//   final_price DECIMAL(10, 2) NOT NULL,
-//   total_amount DECIMAL(10, 2),
-//   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-//   FOREIGN KEY (station_id) REFERENCES stations(id) ON DELETE CASCADE
-// );
-
-// CREATE TABLE IF NOT EXISTS sessions (
-//   id INTEGER PRIMARY KEY AUTOINCREMENT,
-//   station_id INTEGER NOT NULL,
-//   user_id INTEGER NOT NULL,
-//   game_id INTEGER NOT NULL,
-//   created_by INTEGER NOT NULL,
-//   start_time DATETIME NOT NULL,
-//   end_time DATETIME,
-//   base_price DECIMAL(10, 2) NOT NULL,
-//   discount_rate DECIMAL(4, 2) NOT NULL,
-//   final_price DECIMAL(10, 2) NOT NULL,
-//   total_amount DECIMAL(10, 2),
-//   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-//   FOREIGN KEY (station_id) REFERENCES stations(id) ON DELETE CASCADE,
-//   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-//   FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
-//   FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
-// );
-
 export async function seedDatabase(db: Database): Promise<void> {
     try {
         // Start transaction
