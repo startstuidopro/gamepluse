@@ -46,8 +46,7 @@ export default function StationGrid() {
 
   useEffect(() => {
     const loadActiveSessions = async () => {
-        const sessionModel = await SessionModel.getInstance();
-        console.log('stations', Object.values(tables.stations.data));
+        const sessionModel = await SessionModel.getInstance();       
         
         const updatedStations = { ...tables.stations.data };
         
