@@ -1,12 +1,11 @@
-import { Database } from 'sql.js';
-import { seedData } from './seedData';
 
-export async function seedDatabase(db: Database): Promise<void> {
+import { seedData } from './seedData.js';
+
+export default async function seedDatabase(db) {
     try {
-        // Start transaction
         db.exec('BEGIN TRANSACTION');
 
-        // Create tables
+        // Table creation and seeding logic from seed.ts
         db.exec(`
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -138,11 +137,10 @@ export async function seedDatabase(db: Database): Promise<void> {
             );
         `);
 
-        // Check if users table is empty
-        const result = db.exec('SELECT COUNT(*) as count FROM users');
-        const count = result[0].values[0][0] as number;
+        const countStmt = db.prepare('SELECT COUNT(*) as count FROM users');
+        const countResult = countStmt.get();
+        const count = countResult.count;
 
-        // Seed initial data only if users table is empty
         if (count === 0) {
             // Insert default users
             db.exec(`
@@ -154,14 +152,13 @@ export async function seedDatabase(db: Database): Promise<void> {
                     ('Customer User1', '+1224567891', '123456', 'customer', 'premium', 500, CURRENT_TIMESTAMP)
             `);
 
-            // Insert products
             const productStmt = db.prepare(`
                 INSERT INTO products (name, price, cost, category, image, stock, barcode)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             `);
 
             seedData.products.forEach(product => {
-                productStmt.bind([
+                productStmt.run(
                     product.name,
                     product.price,
                     product.cost,
@@ -169,39 +166,31 @@ export async function seedDatabase(db: Database): Promise<void> {
                     product.image,
                     product.stock,
                     product.barcode
-                ]);
-                productStmt.step();
-                productStmt.reset();
+                );
             });
-            productStmt.free();
 
-            // Insert stations
             const stationStmt = db.prepare(`
                 INSERT INTO stations (name, type, status, location, price_per_minute)
                 VALUES (?, ?, ?, ?, ?)
             `);
 
             seedData.stations.forEach(station => {
-                stationStmt.bind([
+                stationStmt.run(
                     station.name,
                     station.type,
                     station.status,
                     station.location,
                     station.price_per_minute
-                ]);
-                stationStmt.step();
-                stationStmt.reset();
+                );
             });
-            stationStmt.free();
 
-            // Insert controllers
             const controllerStmt = db.prepare(`
                 INSERT INTO controllers (name, type, status, price_per_minute, color, identifier, last_maintenance)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             `);
 
             seedData.controllers.forEach(controller => {
-                controllerStmt.bind([
+                controllerStmt.run(
                     controller.name,
                     controller.type,
                     controller.status,
@@ -209,56 +198,45 @@ export async function seedDatabase(db: Database): Promise<void> {
                     controller.color || null,
                     controller.identifier,
                     controller.last_maintenance
-                ]);
-                controllerStmt.step();
-                controllerStmt.reset();
+                );
             });
-            controllerStmt.free();
 
-            // Insert games
             const gameStmt = db.prepare(`
                 INSERT INTO games (name, price_per_minute, image, device_types, is_multiplayer, is_active)
                 VALUES (?, ?, ?, ?, ?, ?)
             `);
 
             seedData.games.forEach(game => {
-                gameStmt.bind([
+                gameStmt.run(
                     game.name,
                     game.price_per_minute,
                     game.image,
                     JSON.stringify(game.device_types),
                     game.is_multiplayer ? 1 : 0,
                     game.is_active ? 1 : 0
-                ]);
-                gameStmt.step();
-                gameStmt.reset();
+                );
             });
-            gameStmt.free();
+
+            db.exec(`
+                INSERT INTO sessions (station_id, user_id, game_id, created_by, start_time, base_price, discount_rate, final_price, total_amount)
+                VALUES (1, 3, 1, 2, CURRENT_TIMESTAMP, 100, 0.1, 90, 90)
+            `);
+
+            db.exec(`
+                INSERT INTO session_controllers (session_id, controller_id)
+                VALUES (1, 1)
+            `);
+
+            db.exec(`
+                UPDATE stations SET current_session_id = 1, status = 'occupied' WHERE id = 1
+            `);
         }
 
-        db.exec(`
-          INSERT INTO sessions (station_id, user_id, game_id, created_by, start_time, base_price, discount_rate, final_price, total_amount)
-          VALUES
-              (1, 3, 1, 2, CURRENT_TIMESTAMP, 100, 0.1, 90, 90)
-        `);
-
-        db.exec(`
-          INSERT INTO session_controllers (session_id, controller_id)
-          VALUES
-              (1, 1)
-        `);
-
-        db.exec(`
-            UPDATE stations SET current_session_id = 1, status = 'occupied' WHERE id = 1
-        `);
-
-        // Commit transaction
         db.exec('COMMIT');
         console.log('Database seeded successfully');
     } catch (error) {
-        // Rollback on error
         db.exec('ROLLBACK');
         console.error('Error seeding database:', error);
         throw error;
     }
-}
+};
